@@ -1,0 +1,46 @@
+[project]
+name = "forecasting"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.13"
+dependencies = [
+    "typer>=0.9.0", # For CLI
+    "pydantic>=2.5.0", # For data validation and settings
+    "pydantic-settings>=2.1.0", # For config
+    "qdrant-client>=1.7.0", # Vector DB
+    "sentence-transformers>=2.2.0", # Embeddings
+    "llama-cpp-python>=0.2.20", # LLM inference
+    "psycopg[binary]>=3.1.0", # Postgres driver (psycopg instead of psycopg2)
+    "SQLAlchemy>=2.0.0", # ORM
+    "apscheduler>=3.10.0", # Scheduling
+    "rich>=13.0.0", # CLI output
+    "numpy>=1.23.0", # For embeddings
+    "pytest>=7.0.0",
+    "pytest-mock>=3.0.0",
+    "mypy>=1.0.0",
+    "uv>=0.1.10", # Uv itself if managed globally or for CI
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "alembic>=1.12.0", # For DB migrations
+    "psycopg2-binary>=2.9.10",
+    "feedparser>=6.0.11",
+    "bs4>=0.0.2",
+    "fitz>=0.0.1.dev2",
+    "pymupdf>=1.23.0",
+]
+
+[project.scripts]
+forecast_cli = "forecasting.cli:app"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "PL"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
