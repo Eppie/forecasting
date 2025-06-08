@@ -1,15 +1,17 @@
-import os, asyncio
-from typing import List, Dict
+import asyncio
+import os
 
 from brave_search_python_client import BraveSearch, WebSearchRequest
 from pydantic import BaseModel, Field
 
+
 class BraveArgs(BaseModel):
     """Arguments accepted by the brave_search tool."""
+
     query: str = Field(..., description="Plain-English search query")
     limit: int = Field(10, ge=1, le=25, description="Max # of hits")
 
-def brave_search(query: str, limit: int = 10) -> List[Dict[str, str]]:
+def brave_search(query: str, limit: int = 10) -> list[dict[str, str]]:
     """
     Search the public web with Brave and return compact JSON hits.
     Designed for Ollama's function-calling interface.
@@ -20,7 +22,7 @@ def brave_search(query: str, limit: int = 10) -> List[Dict[str, str]]:
 
     client = BraveSearch(api_key=api_key)
 
-    async def _go() -> List[Dict[str, str]]:
+    async def _go() -> list[dict[str, str]]:
         resp = await client.web(WebSearchRequest(q=query, count=limit))
         hits = resp.web.results if resp.web else []
         return [

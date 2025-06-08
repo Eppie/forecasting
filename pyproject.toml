@@ -18,6 +18,9 @@ dependencies = [
     "psutil>=7.0.0",
 ]
 
+[project.scripts]
+forecasting = "src.cli:app"
+
 
 [tool.ruff]
 line-length = 120
@@ -31,3 +34,4 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+ignore_missing_imports = true
