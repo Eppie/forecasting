@@ -1,13 +1,12 @@
-# chat_loop.py
 import json
 from typing import cast
 
 import ollama
 from pydantic import BaseModel
 
-from src.tools.web_search import brave_search
+from src.tools.web_search import web_search
 
-tools = [brave_search]
+tools = [web_search]
 
 
 class TopLinks(BaseModel):
@@ -27,7 +26,7 @@ def run_chat(user_prompt: str, model: str = "llama3.3") -> TopLinks:
     tool_outputs = []
     for tc in first.message.tool_calls or []:
         if tc.function.name == "brave_search":
-            out = brave_search(**tc.function.arguments)
+            out = web_search(**tc.function.arguments)
             tool_outputs.append(
                 {
                     "role": "tool",

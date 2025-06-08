@@ -5,15 +5,15 @@ from brave_search_python_client import BraveSearch, WebSearchRequest
 from pydantic import BaseModel, Field
 
 
-class BraveArgs(BaseModel):
-    """Arguments accepted by the brave_search tool."""
+class SearchArgs(BaseModel):
+    """Arguments accepted by the web_search tool."""
 
     query: str = Field(..., description="Plain-English search query")
-    limit: int = Field(10, ge=1, le=25, description="Max # of hits")
+    limit: int = Field(10, ge=1, le=10, description="Max # of hits")
 
-def brave_search(query: str, limit: int = 10) -> list[dict[str, str]]:
+def web_search(query: str, limit: int = 10) -> list[dict[str, str]]:
     """
-    Search the public web with Brave and return compact JSON hits.
+    Search the public web and return compact JSON hits.
     Designed for Ollama's function-calling interface.
     """
     api_key = os.getenv("BRAVE_SEARCH_API_KEY")
