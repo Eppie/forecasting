@@ -1,7 +1,8 @@
 import os, asyncio
 from typing import List, Dict
+
+from brave_search_python_client import BraveSearch, WebSearchRequest
 from pydantic import BaseModel, Field
-from brave_search import BraveSearch, WebSearchRequest
 
 class BraveArgs(BaseModel):
     """Arguments accepted by the brave_search tool."""
