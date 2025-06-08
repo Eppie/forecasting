@@ -1,11 +1,13 @@
 # chat_loop.py
-import json, ollama
+import json
+from typing import cast
+
+import ollama
+from pydantic import BaseModel
 
 from src.tools.web_search import brave_search
 
 tools = [brave_search]
-
-from pydantic import BaseModel
 
 
 class TopLinks(BaseModel):
@@ -44,7 +46,7 @@ def run_chat(user_prompt: str, model: str = "llama3.3") -> TopLinks:
         options={"temperature": 0},
     )
 
-    return TopLinks.model_validate_json(second.message.content)
+    return cast(TopLinks, TopLinks.model_validate_json(second.message.content))
 
 
 if __name__ == "__main__":
