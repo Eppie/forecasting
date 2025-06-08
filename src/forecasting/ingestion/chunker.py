@@ -1,5 +1,3 @@
-# src/forecasting/ingestion/chunker.py
-
 from forecasting.ingestion.models import ParsedDocument, TextChunk
 
 # For more advanced chunking, consider LangChain's text_splitters

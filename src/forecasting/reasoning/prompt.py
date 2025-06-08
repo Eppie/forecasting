@@ -2,7 +2,7 @@ from forecasting.ingestion.vector_store import ChunkData
 
 
 def build_rag_prompt(
-    question: str, retrieved_chunks: list[ChunkData]
+        question: str, retrieved_chunks: list[ChunkData]
 ) -> tuple[str, dict[str, ChunkData]]:
     """
     Builds the prompt for the LLM, including retrieved context and citation mapping.
@@ -44,3 +44,39 @@ def build_rag_prompt(
 
     full_prompt = f"{system_message}\n\nContext:\n{context_str}\nUser Question: {question}\n\nAssistant's Step-by-Step Forecast:"
     return full_prompt, citation_map
+
+
+def build_search_query_generation_prompt(forecasting_question: str, max_web_queries: int = 3,
+                                         max_news_queries: int = 2) -> str:
+    """
+    Creates a prompt to ask the LLM to generate effective search queries.
+    """
+    prompt = f"""
+You are an expert research assistant. Your task is to help gather information to answer the following forecasting question:
+"{forecasting_question}"
+
+To do this, please generate a list of search queries that would be most effective.
+Provide distinct queries for general web searches and for news searches.
+
+Consider:
+- Key entities, events, and concepts in the forecasting question.
+- Different angles or sub-questions that need to be explored.
+- Keywords that are likely to yield relevant, high-quality sources (e.g., official reports, reputable news, expert analyses).
+- For news searches, focus on queries that will find recent and relevant articles.
+
+Please output your suggested queries in a JSON array format, where each object in the array has a "type" ("web" or "news") and a "query" (the search string).
+Generate up to {max_web_queries} "web" search queries and up to {max_news_queries} "news" search queries.
+Prioritize queries that are most likely to find factual, citable information.
+
+Example JSON Output:
+```json
+[
+  {{"type": "web", "query": "economic impact of recent AI advancements on software industry"}},
+  {{"type": "web", "query": "analyst predictions for [Company X] stock Q4 2024"}},
+  {{"type": "news", "query": "latest developments [Competitor Y] product launch"}},
+  {{"type": "news", "query": "[Relevant Geopolitical Event] updates this week"}}
+]```
+
+Your JSON output of suggested search queries:
+"""
+    return prompt
