@@ -1,6 +1,7 @@
-import typer
+import typer  # type: ignore
 
 app = typer.Typer(help="CLI for forecasting questions")
+
 
 @app.command()
 def forecast(

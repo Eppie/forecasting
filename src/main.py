@@ -30,7 +30,7 @@ def run_chat(user_prompt: str, model: str = "llama3.3") -> TopLinks:
             tool_outputs.append(
                 {
                     "role": "tool",
-                    "content": json.dumps(out)  # must be a string
+                    "content": json.dumps(out),  # must be a string
                 }
             )
 
@@ -38,14 +38,18 @@ def run_chat(user_prompt: str, model: str = "llama3.3") -> TopLinks:
     second = ollama.chat(
         model=model,
         messages=[
-            *first.messages,  # original conversation so far
-            *tool_outputs  # the search results
+            {"role": "user", "content": user_prompt},
+            first.message.model_dump(),
+            *tool_outputs,
         ],
         format=TopLinks.model_json_schema(),  # constrain reply
         options={"temperature": 0},
     )
 
-    return cast(TopLinks, TopLinks.model_validate_json(second.message.content))
+    content = second.message.content
+    if content is None:
+        raise ValueError("Model returned empty content")
+    return cast(TopLinks, TopLinks.model_validate_json(content))
 
 
 if __name__ == "__main__":
