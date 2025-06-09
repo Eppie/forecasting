@@ -1,7 +1,8 @@
 from pprint import pprint
 
 import typer  # type: ignore
-from workflow import run_workflow
+
+from .workflow import run_workflow
 
 app = typer.Typer(help="CLI for forecasting questions")
 
