@@ -53,11 +53,20 @@ def test_run_workflow_calls_clarify(mocker: MockerFixture) -> None:
     assert result is q
 
 
+def test_set_base_rate(mocker: MockerFixture) -> None:
+    q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
+    data = {"reference_class": "past AGI timeline predictions"}
+    chat_mock = mocker.patch("src.workflow.ollama.chat", return_value=fake_chat_response(data))
+
+    result = set_base_rate(q)
+    chat_mock.assert_called_once()
+    assert isinstance(result, BaseRate)
+    assert result.reference_class == data["reference_class"]
+    assert result.frequency == 0.0
+
+
 def test_other_stubs() -> None:
     q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
-
-    with pytest.raises(NotImplementedError):
-        set_base_rate(q)
 
     with pytest.raises(NotImplementedError):
         decompose_problem(q)
