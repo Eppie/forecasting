@@ -23,7 +23,7 @@ from src import (
 )
 
 
-def fake_chat_response(data: dict[str, Any]) -> ollama.ChatResponse:
+def fake_chat_response(data: Any) -> ollama.ChatResponse:
     return ollama.ChatResponse(message=ollama.Message(role="assistant", content=json.dumps(data)))
 
 
@@ -65,11 +65,22 @@ def test_set_base_rate(mocker: MockerFixture) -> None:
     assert result.frequency == 0.0
 
 
+def test_decompose_problem(mocker: MockerFixture) -> None:
+    q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
+    data = [
+        {"driver": "Breakthrough in algorithms", "probability": 0.2},
+        {"driver": "Hardware progress", "probability": 0.3},
+        {"driver": "Combined", "probability": 0.06},
+    ]
+    chat_mock = mocker.patch("src.workflow.ollama.chat", return_value=fake_chat_response(data))
+
+    result = decompose_problem(q)
+    chat_mock.assert_called_once()
+    assert result == data
+
+
 def test_other_stubs() -> None:
     q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
-
-    with pytest.raises(NotImplementedError):
-        decompose_problem(q)
 
     with pytest.raises(NotImplementedError):
         gather_evidence(q)

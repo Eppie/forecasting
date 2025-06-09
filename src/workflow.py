@@ -114,8 +114,56 @@ def set_base_rate(question: Question) -> BaseRate:
 
 
 def decompose_problem(question: Question) -> list[Any]:
-    """Break the question into smaller drivers."""
-    raise NotImplementedError
+    """Break the question into smaller drivers.
+
+    This step constructs an "inside view" by asking the model to:
+
+    1. Break the event into independent drivers.
+    2. Assign rough probabilities or ranges to each driver.
+    3. Recombine the pieces into a single probability estimate.
+
+    The model is expected to return JSON where each element describes a
+    driver and its probability. The final element should represent the
+    combined inside-view probability.
+
+    Args:
+        question: The clarified forecasting question.
+
+    Returns:
+        A list of driver descriptions with probabilities. The last element
+        represents the combined inside-view estimate.
+    """
+
+    system_prompt = (
+        'Break the event into independent drivers ("Could a shooter get close?"'
+        ' × "Security failure?" × "Medical non-survival?"). '
+        "Assign rough probabilities or ranges to each piece using back-of-the-envelope"
+        " logic. Recombine (usually by multiplication or scenario trees) to create"
+        " an inside-view estimate that you will compare against the base rate."
+        " Return the result as a JSON list of objects with fields 'driver' and"
+        " 'probability'. Include a final object with driver 'combined' containing"
+        " the inside-view probability."
+    )
+
+    response = ollama.chat(
+        model="llama3.3",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question.text},
+        ],
+        format="json",
+        options={"temperature": 0},
+    )
+
+    content = response.message.content
+    if content is None:
+        raise ValueError("Model returned empty content")
+
+    data = json.loads(content)
+    if not isinstance(data, list):
+        raise ValueError("Model did not return a list")
+
+    return data
 
 
 def gather_evidence(question: Question) -> list[Any]:
