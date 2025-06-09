@@ -1,7 +1,6 @@
 import json
 
 import ollama
-
 from src.tools.web_search import web_search
 
 tools = [web_search]

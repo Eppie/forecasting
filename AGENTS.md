@@ -53,6 +53,15 @@ The following tools are used in this project. Adhere to their configurations and
 *   Ensure all tests pass by running the `pytest` command.
 *   Aim for high test coverage for any new code that is generated.
 
+### 3.4 Pre-commit
+
+`pre-commit` manages the lint and type-check hooks for this project.
+
+*   Install the hooks with `pre-commit install`.
+*   Run `pre-commit run --files <modified files>` before committing, or run
+    `pre-commit run --all-files` for a full check.
+*   You can also execute `./scripts/run_checks.sh` to run all checks manually.
+
 ## 4. Python 3.13 Best Practices
 
 This project uses Python 3.13, and the code should reflect modern practices.
