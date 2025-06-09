@@ -12,8 +12,9 @@ dependencies = [
     "mypy>=1.0.0",
     "uv>=0.7.12", # Uv itself if managed globally or for CI
     "ruff>=0.11.13",
-    "ollama-python",
+    "ollama",
     "brave-search-python-client>=0.3.27",
+    "pre-commit",
     "psutil>=7.0.0",
     "playwright>=1.52.0",
 ]
