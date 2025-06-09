@@ -23,7 +23,7 @@ The underlying forecasting implementation is still a stub.
 Install `pre-commit` and set up the hooks:
 
 ```bash
-pip install pre-commit
+uv pip install pre-commit
 pre-commit install
 ```
 
