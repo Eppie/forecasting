@@ -71,8 +71,48 @@ class BaseRate:
 
 
 def set_base_rate(question: Question) -> BaseRate:
-    """Determine the base rate for a question."""
-    raise NotImplementedError
+    """Determine the base rate for a question.
+
+    Step 1 identifies a suitable reference class for the question using an LLM.
+    Step 2 (measuring the historical frequency) is not yet implemented and the
+    returned ``BaseRate`` therefore uses ``0.0`` as a placeholder for
+    ``frequency``.
+
+    Args:
+        question: The clarified forecasting question.
+
+    Returns:
+        A :class:`BaseRate` with the reference class filled in and ``frequency``
+        set to ``0.0`` until the next step is implemented.
+    """
+
+    system_prompt = (
+        "Suggest an appropriate reference class for the following forecasting "
+        "question. Return JSON with a single field 'reference_class'."
+    )
+
+    response = ollama.chat(
+        model="llama3.3",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question.text},
+        ],
+        format="json",
+        options={"temperature": 0},
+    )
+
+    content = response.message.content
+    if content is None:
+        raise ValueError("Model returned empty content")
+
+    data = json.loads(content)
+    reference_class = str(data.get("reference_class", ""))
+
+    # TODO: implement measurement of historical frequency based on the chosen
+    # reference class.
+    frequency = 0.0
+
+    return BaseRate(reference_class=reference_class, frequency=frequency)
 
 
 def decompose_problem(question: Question) -> list[Any]:
