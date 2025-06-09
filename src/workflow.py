@@ -1,5 +1,3 @@
-"""Stub definitions for the forecasting workflow."""
-
 from __future__ import annotations
 
 import json
