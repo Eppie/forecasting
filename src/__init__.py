@@ -10,6 +10,7 @@ from .workflow import (
     gather_evidence,
     produce_forecast,
     record_forecast,
+    run_workflow,
     sanity_checks,
     set_base_rate,
     update_prior,
@@ -29,4 +30,5 @@ __all__ = [
     "sanity_checks",
     "cross_validate",
     "record_forecast",
+    "run_workflow",
 ]
