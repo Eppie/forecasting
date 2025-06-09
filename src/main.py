@@ -1,8 +1,6 @@
 import json
-from typing import cast
 
 import ollama
-from pydantic import BaseModel
 
 from src.tools.web_search import web_search
 
