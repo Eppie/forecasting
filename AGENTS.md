@@ -20,9 +20,9 @@ The following tools are used in this project. Adhere to their configurations and
 
 **Instructions for Codex:**
 
-*   Before committing any code changes, run `ruff format .` to format the code.
-*   After formatting, run `ruff check --fix .` to lint the code and automatically fix any issues.
-*   Ensure all new code passes `ruff check .` without any errors.
+*   Before committing any code changes, run `uv run ruff format .` to format the code.
+*   After formatting, run `uv run ruff check --fix .` to lint the code and automatically fix any issues.
+*   Ensure all new code passes `uv run ruff check .` without any errors.
 
 ### 3.2 Mypy (Static Type Checking)
 
@@ -32,7 +32,7 @@ The following tools are used in this project. Adhere to their configurations and
 
 *   All new functions and methods must have type hints for all arguments and return values.
 *   Avoid using `Any` where a more specific type can be used.
-*   Run `mypy .` to perform a static type check on the entire codebase. The command should pass without any errors.
+*   Run `uv run mypy .` to perform a static type check on the entire codebase. The command should pass without any errors.
 
 ### 3.3 Pytest (Testing)
 
@@ -50,14 +50,14 @@ The following tools are used in this project. Adhere to their configurations and
 **Instructions for Codex:**
 
 *   When adding new functionality, create a corresponding test file and add comprehensive unit tests.
-*   Ensure all tests pass by running the `pytest` command.
+*   Ensure all tests pass by running the `uv run pytest` command.
 *   Aim for high test coverage for any new code that is generated.
 
 ### 3.4 Pre-commit
 
 `pre-commit` manages the lint and type-check hooks for this project.
 
-*   Install the hooks with `pre-commit install`.
+*   Install the hooks with `uv run pre-commit install`.
 *   Run `pre-commit run --files <modified files>` before committing, or run
     `pre-commit run --all-files` for a full check.
 *   You can also execute `./scripts/run_checks.sh` to run all checks manually.
