@@ -4,9 +4,10 @@ import json
 import sys
 from pathlib import Path
 
-import ollama
 import pytest
 from pytest_mock import MockerFixture  # type: ignore
+
+import ollama
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from src.ollama_utils import execute_tool_calls, generate_search_queries

@@ -17,3 +17,18 @@ forecasting forecast "Will we colonize Mars soon?" --verbose
 ```
 
 The underlying forecasting implementation is still a stub.
+
+## Development
+
+Install `pre-commit` and set up the hooks:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Run all checks (formatting, linting, type checking, and tests):
+
+```bash
+./scripts/run_checks.sh
+```

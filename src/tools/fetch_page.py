@@ -25,6 +25,6 @@ def fetch_page(url: str) -> str:
         browser = pw.chromium.launch()
         page = browser.new_page()
         page.goto(url)
-        content = page.content()
+        content = str(page.content())
         browser.close()
     return content
