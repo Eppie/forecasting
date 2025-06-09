@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-forecasting = "src.cli:app"
+forecasting = "cli:app"
 
 
 [tool.ruff]
