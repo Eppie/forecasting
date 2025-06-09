@@ -46,6 +46,7 @@ module = [
     "pydantic",
     "pydantic_settings",
     "typer",
+    "typer.testing",
     "playwright.*",
     "brave_search_python_client.*",
     "psutil",

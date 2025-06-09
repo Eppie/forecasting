@@ -1,4 +1,8 @@
+from pprint import pprint
+
 import typer  # type: ignore
+
+from src.workflow import run_workflow
 
 app = typer.Typer(help="CLI for forecasting questions")
 
@@ -11,9 +15,9 @@ def forecast(
     """Pose a forecasting question"""
     if verbose:
         typer.echo(f"Forecasting question: {question}")
-    else:
-        typer.echo("Forecasting: " + question)
-    # TODO: integrate forecasting backend
+
+    result = run_workflow(question)
+    pprint(result)
 
 
 if __name__ == "__main__":

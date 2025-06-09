@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
+
+import ollama
 
 
 @dataclass
 class Question:
     """Forecasting question details."""
 
+    reasoning: str
     text: str
     resolution_rule: str | None = None
     variable_type: str | None = None
@@ -24,7 +28,38 @@ def clarify_question(question: str) -> Question:
     Returns:
         A ``Question`` instance.
     """
-    raise NotImplementedError
+    system_prompt = (
+        "Clarify the following forecasting question."
+        " Provide JSON with fields 'question', 'reasoning',"
+        " 'resolution_rule', and 'variable_type'."
+    )
+
+    response = ollama.chat(
+        model="llama3.3",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question},
+        ],
+        format="json",
+        options={"temperature": 0},
+    )
+
+    content = response.message.content
+    if content is None:
+        raise ValueError("Model returned empty content")
+    data = json.loads(content)
+
+    reasoning = str(data.get("reasoning", ""))
+    text = str(data.get("question", question))
+    resolution_rule = data.get("resolution_rule")
+    variable_type = data.get("variable_type")
+
+    return Question(
+        reasoning=reasoning,
+        text=text,
+        resolution_rule=resolution_rule,
+        variable_type=variable_type,
+    )
 
 
 @dataclass
@@ -73,3 +108,9 @@ def cross_validate(probability: float) -> None:
 def record_forecast(question: Question, probability: float) -> None:
     """Record the forecast and related metadata."""
     raise NotImplementedError
+
+
+def run_workflow(question_text: str) -> Question:
+    """Run the forecasting workflow for a single question."""
+
+    return clarify_question(question_text)
