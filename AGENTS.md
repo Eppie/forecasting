@@ -9,6 +9,7 @@ This is a Python project that uses `ruff` for linting and formatting, `mypy` for
 *   **File Encoding:** All Python files must be UTF-8 encoded.
 *   **Clarity and Simplicity:** Write code that is easy to read and understand. Add comments for complex logic.
 *   **Naming Conventions:** Use descriptive and meaningful names for variables, functions, and classes. Follow PEP 8 naming conventions (e.g., `snake_case` for functions and variables, `PascalCase` for classes).
+*   **Known Issues:** Review `ISSUES.md` for previously encountered problems and their solutions before starting new work.
 
 ## 3. Tooling and Commands
 

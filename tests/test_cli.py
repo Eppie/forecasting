@@ -8,14 +8,12 @@ from typer.testing import CliRunner
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 from src.cli import app
-from src.workflow import Question
 
 
 def test_cli_invokes_workflow(mocker: MockerFixture) -> None:
-    q = Question(reasoning="r", text="t")
-    mocker.patch("src.cli.run_workflow", return_value=q)
+    mocker.patch("src.cli.run_workflow", return_value=0.42)
 
     runner = CliRunner()
     result = runner.invoke(app, ["Will AI?"])
     assert result.exit_code == 0
-    assert "reasoning='r'" in result.stdout
+    assert "0.42" in result.stdout
