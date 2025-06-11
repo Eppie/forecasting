@@ -4,16 +4,17 @@ from .ollama_utils import execute_tool_calls, generate_search_queries
 from .workflow import (
     BaseRate,
     Question,
+    apply_evidence,
     clarify_question,
     cross_validate,
     decompose_problem,
     gather_evidence,
     produce_forecast,
+    reconcile_views,
     record_forecast,
     run_workflow,
     sanity_checks,
     set_base_rate,
-    update_prior,
 )
 
 __all__ = [
@@ -25,7 +26,8 @@ __all__ = [
     "set_base_rate",
     "decompose_problem",
     "gather_evidence",
-    "update_prior",
+    "apply_evidence",
+    "reconcile_views",
     "produce_forecast",
     "sanity_checks",
     "cross_validate",

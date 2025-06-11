@@ -11,7 +11,7 @@ from src.cli import app
 
 
 def test_cli_invokes_workflow(mocker: MockerFixture) -> None:
-    mocker.patch("src.cli.run_workflow", return_value=0.42)
+    mocker.patch("src.cli.run_workflow", return_value={"probability": 0.42, "rationale": "r"})
 
     runner = CliRunner()
     result = runner.invoke(app, ["Will AI?"])

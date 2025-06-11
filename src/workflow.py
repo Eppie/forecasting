@@ -72,37 +72,20 @@ def clarify_question(question: str) -> Question:
 class BaseRate:
     """Base rate prior information."""
 
+    reasoning: str
     reference_class: str
     frequency: float
 
 
 def set_base_rate(question: Question) -> BaseRate:
-    """Determine the base rate for a question.
-
-    2.1 Identify a reference class.
-        Choose past events that are similar enough to share causal structure
-        (e.g., sitting U.S. presidents killed in office).  ￼
-        2.2	Measure historical frequency or distribution.
-            For binaries, convert to a %; for numerics, fit a simple distribution (median, 5th/95th-percentiles).  ￼
-        2.3	Write down that number—this is your prior.
-            Resist the urge to tweak it yet; superforecasters explicitly anchor on the base rate first.
-
-    Step 1 identifies a suitable reference class for the question using an LLM.
-    Step 2 (measuring the historical frequency) is not yet implemented and the
-    returned ``BaseRate`` therefore uses ``0.0`` as a placeholder for
-    ``frequency``.
-
-    Args:
-        question: The clarified forecasting question.
-
-    Returns:
-        A :class:`BaseRate` with the reference class filled in and ``frequency``
-        set to ``0.0`` until the next step is implemented.
-    """
+    """Determine the base rate for a question by finding a reference class and its historical frequency."""
 
     system_prompt = (
-        "Suggest an appropriate reference class for the following forecasting "
-        "question. Return JSON with a single field 'reference_class'."
+        "You are an expert forecaster. For the given question, determine the 'outside view' base rate. "
+        "First, identify a suitable reference class of similar past events. "
+        "Second, based on historical data, state the frequency of the outcome in that class. "
+        "Provide your reasoning for this choice. "
+        "Return JSON with fields 'reference_class', 'frequency', and 'reasoning'."
     )
 
     response = ollama.chat(
@@ -121,12 +104,13 @@ def set_base_rate(question: Question) -> BaseRate:
 
     data = json.loads(content)
     reference_class = str(data.get("reference_class", ""))
+    frequency = float(data.get("frequency", 0.5))
+    reasoning = str(data.get("reasoning", ""))
 
-    # TODO: implement measurement of historical frequency based on the chosen
-    # reference class.
-    frequency = 0.0
+    if not reference_class or not reasoning:
+        raise ValueError("Model failed to return a valid reference class and reasoning.")
 
-    return BaseRate(reference_class=reference_class, frequency=frequency)
+    return BaseRate(reasoning=reasoning, reference_class=reference_class, frequency=frequency)
 
 
 def decompose_problem(question: Question) -> list[Any]:
@@ -183,6 +167,29 @@ def decompose_problem(question: Question) -> list[Any]:
     return data
 
 
+def reconcile_views(base_rate: BaseRate, inside_view_decomposition: list[Any]) -> float:
+    """Reconcile the outside and inside views to create an anchor probability."""
+
+    inside_view_prob = 0.5
+    for item in inside_view_decomposition:
+        if isinstance(item, dict) and item.get("driver") == "combined":
+            inside_view_prob = float(item.get("probability", 0.5))
+            break
+    else:
+        print("Warning: 'combined' driver not found in decomposition. Defaulting inside view to 0.5.")
+
+    outside_view_prob = base_rate.frequency
+    reconciled_prob = (outside_view_prob + inside_view_prob) / 2
+
+    print(
+        "Reconciling Views: Outside View (Base Rate): "
+        f"{outside_view_prob:.2%}, Inside View (Decomposition): {inside_view_prob:.2%}"
+    )
+    print(f"Reconciled Anchor Probability: {reconciled_prob:.2%}")
+
+    return reconciled_prob
+
+
 def gather_evidence(question: Question) -> list[Any]:
     """Collect evidence relevant to the question.
 
@@ -233,8 +240,8 @@ def gather_evidence(question: Question) -> list[Any]:
     return data
 
 
-def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
-    """Update the prior probability based on evidence.
+def apply_evidence(start_probability: float, evidence: list[Any]) -> float:
+    """Update a starting probability based on evidence with likelihood ratios.
 
     5.1 Translate each piece of evidence into a likelihood ratio (formal Bayes or an intuitive ×/÷).
         5.2 Apply sequential updating to move your prior toward the inside-view figure from Step 3.
@@ -247,14 +254,14 @@ def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
     ratios. Items lacking the key are ignored.
 
     Args:
-        base_rate: The base rate prior information.
+        start_probability: The anchor probability.
         evidence: A list of evidence dictionaries.
 
     Returns:
         The posterior probability after applying all likelihood ratios.
     """
 
-    probability = base_rate.frequency
+    probability = start_probability
     for item in evidence:
         if isinstance(item, dict) and "likelihood_ratio" in item:
             lr = float(item["likelihood_ratio"])
@@ -270,8 +277,8 @@ def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
     return probability
 
 
-def produce_forecast(probability: float) -> float:
-    """Produce the final forecast probability.
+def produce_forecast(probability: float, question: Question) -> dict[str, Any]:
+    """Produce the final forecast with a one-sentence rationale.
 
     6.1 Binary Question
         Report: single probability rounded to the nearest whole % (e.g., 11 %) and one-sentence rationale.
@@ -286,39 +293,92 @@ def produce_forecast(probability: float) -> float:
     two decimal places.
 
     Args:
-        probability: Posterior probability from :func:`update_prior`.
+        probability: The final posterior probability.
+        question: The clarified question.
 
     Returns:
-        The rounded probability.
+        A dictionary with the final probability and a rationale.
     """
 
     if not 0 <= probability <= 1:
         raise ValueError("Probability must be between 0 and 1")
 
-    return round(probability, 2)
+    system_prompt = (
+        "You are a forecasting analyst. Given the final probability for the question, "
+        "write a concise, one-sentence rationale explaining the forecast. "
+        "Report the probability rounded to the nearest whole percent."
+    )
+    context = f"Question: {question.text}\nFinal Probability: {probability:.3f}"
+
+    response = ollama.chat(
+        model="llama3.3",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": context},
+        ],
+    )
+
+    rationale = response.message.content or "Rationale could not be generated."
+
+    final_prob_rounded = round(probability, 2)
+
+    return {"probability": final_prob_rounded, "rationale": rationale.strip()}
 
 
-def sanity_checks(probability: float) -> None:
-    """Perform sanity and bias checks on the forecast.
+def sanity_checks(
+    probability: float,
+    base_rate: BaseRate,
+    question: Question,
+    decomposition: list[Any],
+    evidence: list[Any],
+) -> None:
+    """Perform sanity and bias checks using an LLM as a "red team"."""
 
-    7.1 Check against the base-rate anchor. If you moved > 4× in odds, be ready to justify.
-        7.2 Overconfidence sweep. Ask: Would I bet money at these odds?
-        7.3 Common cognitive traps checklist: availability, confirmation, wishful thinking.
+    base_rate_odds = base_rate.frequency / (1 - base_rate.frequency)
+    final_odds = probability / (1 - probability)
+    if final_odds > base_rate_odds * 4 or final_odds < base_rate_odds / 4:
+        print(
+            "Warning: Final odds "
+            f"({final_odds:.2f}) have shifted by more than 4x "
+            f"from the base rate odds ({base_rate_odds:.2f})."
+        )
 
-    This simplified version only verifies that the probability is within ``[0, 1]``.
-    In a production system additional checks for common cognitive biases would be performed.
+    system_prompt = (
+        "You are a devil's advocate and expert in cognitive biases. "
+        "Review the following forecast and challenge it. "
+        "Specifically, check for: \n"
+        "1.  **Availability Heuristic:** Is the forecast overly influenced by recent, vivid news? \n"
+        "2.  **Confirmation Bias:** Does the evidence search look one-sided? \n"
+        "3.  **Wishful Thinking:** Could the forecaster's desires be influencing the probability? \n"
+        "4.  **Overconfidence:** Is the forecast too extreme? Ask 'Would I bet my own money at these odds?' \n"
+        "Provide a short, critical review pointing out the single biggest potential flaw or bias."
+    )
 
-    Args:
-        probability: Probability to validate.
+    context = (
+        f"Forecasting Question: {question.text}\n"
+        f"Initial Base Rate (Outside View): {base_rate.frequency:.2%} ({base_rate.reference_class})\n"
+        f"Inside View Decomposition: {json.dumps(decomposition, indent=2)}\n"
+        f"Key Evidence Considered: {json.dumps(evidence, indent=2)}\n"
+        f"---"
+        f"Final Forecast Probability: {probability:.2%}\n"
+        f"---"
+        f"Critique this forecast based on the instructions."
+    )
 
-    Raises:
-        ValueError: If ``probability`` lies outside the allowed range.
-    """
+    response = ollama.chat(
+        model="llama3.3",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": context},
+        ],
+        options={"temperature": 0.5},
+    )
 
-    if not 0 <= probability <= 1:
-        raise ValueError("Probability must be between 0 and 1")
-
-    # No further action in this stub implementation.
+    critique = response.message.content
+    print("\n--- Sanity & Bias Check ---")
+    if critique:
+        print(critique)
+    print("---------------------------\n")
 
 
 def cross_validate(probability: float) -> None:
@@ -332,28 +392,38 @@ def cross_validate(probability: float) -> None:
     # Placeholder for external cross-validation logic.
 
 
-def record_forecast(question: Question, probability: float) -> None:
-    """Record the forecast and related metadata.
+def record_forecast(
+    question: Question,
+    base_rate: BaseRate,
+    decomposition: list[Any],
+    evidence: list[Any],
+    final_forecast: dict[str, Any],
+) -> None:
+    """Record the full forecast and its components to a file."""
 
-    9.1 The final forecast and date.
-        9.2 Key assumptions, data sources, and Fermi breakdown.
+    import datetime
 
-    The forecast is appended as a JSON line to ``forecasts.jsonl`` in the current
-    working directory. Each line contains the question text and the probability
-    value.
-
-    Args:
-        question: The clarified question being answered.
-        probability: The final forecast probability.
-    """
-
-    entry = {"question": question.text, "probability": probability}
+    entry = {
+        "question": question.text,
+        "resolution_rule": question.resolution_rule,
+        "forecast_date": datetime.datetime.now().isoformat(),
+        "final_forecast": final_forecast,
+        "components": {
+            "base_rate": {
+                "reasoning": base_rate.reasoning,
+                "reference_class": base_rate.reference_class,
+                "frequency": base_rate.frequency,
+            },
+            "decomposition": decomposition,
+            "evidence": evidence,
+        },
+    }
     with open("forecasts.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
 
-def run_workflow(question_text: str) -> float:
-    """Run the forecasting workflow for a single question.
+def run_workflow(question_text: str) -> dict[str, Any]:
+    """Run the full superforecasting workflow for a single question.
 
     The function executes each step of the forecasting workflow in order:
 
@@ -375,12 +445,28 @@ def run_workflow(question_text: str) -> float:
     """
 
     question = clarify_question(question_text)
+    print(f"1. Clarified Question: '{question.text}' ({question.variable_type})")
+
     base_rate = set_base_rate(question)
-    decompose_problem(question)
+    print(f"2. Base Rate (Outside View): {base_rate.frequency:.2%} from class '{base_rate.reference_class}'")
+
+    decomposition = decompose_problem(question)
+    print("3. Problem Decomposed (Inside View)")
+
+    reconciled_anchor = reconcile_views(base_rate, decomposition)
+
     evidence = gather_evidence(question)
-    prior = update_prior(base_rate, evidence)
-    probability = produce_forecast(prior)
-    sanity_checks(probability)
-    cross_validate(probability)
-    record_forecast(question, probability)
-    return probability
+    print(f"5. Gathered {len(evidence)} pieces of new evidence.")
+
+    posterior_prob = apply_evidence(reconciled_anchor, evidence)
+    print(f"6. Probability updated to {posterior_prob:.2%} after evidence.")
+
+    sanity_checks(posterior_prob, base_rate, question, decomposition, evidence)
+
+    final_forecast = produce_forecast(posterior_prob, question)
+    print(f"8. Final Forecast: {final_forecast['probability']:.0%} - {final_forecast['rationale']}")
+
+    record_forecast(question, base_rate, decomposition, evidence, final_forecast)
+    print("9. Forecast recorded to forecasts.jsonl")
+
+    return final_forecast
