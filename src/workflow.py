@@ -20,6 +20,14 @@ class Question:
 def clarify_question(question: str) -> Question:
     """Return a ``Question`` object from raw text.
 
+    1.1 Write the question verbatim.
+        Record the wording, date, and who asked it so you can track resolution later.
+    1.2 Define an unambiguous resolution rule.
+        Specify what counts as “yes,” “no,” or the numeric outcome, the exact end-date,
+        and a publicly checkable source (e.g., “Trump assassinated” = death caused by violence,
+        confirmed by two major newswires, any time before noon EST 20 Jan 2029).
+    1.3 Classify the variable type. Binary → probability; continuous → predictive distribution.
+
     Args:
         question: The question to clarify.
 
@@ -71,6 +79,14 @@ class BaseRate:
 def set_base_rate(question: Question) -> BaseRate:
     """Determine the base rate for a question.
 
+    2.1 Identify a reference class.
+        Choose past events that are similar enough to share causal structure
+        (e.g., sitting U.S. presidents killed in office).  ￼
+        2.2	Measure historical frequency or distribution.
+            For binaries, convert to a %; for numerics, fit a simple distribution (median, 5th/95th-percentiles).  ￼
+        2.3	Write down that number—this is your prior.
+            Resist the urge to tweak it yet; superforecasters explicitly anchor on the base rate first.
+
     Step 1 identifies a suitable reference class for the question using an LLM.
     Step 2 (measuring the historical frequency) is not yet implemented and the
     returned ``BaseRate`` therefore uses ``0.0`` as a placeholder for
@@ -117,10 +133,11 @@ def decompose_problem(question: Question) -> list[Any]:
     """Break the question into smaller drivers.
 
     This step constructs an "inside view" by asking the model to:
-
-    1. Break the event into independent drivers.
-    2. Assign rough probabilities or ranges to each driver.
-    3. Recombine the pieces into a single probability estimate.
+        3.1	Break the event into independent drivers
+            (“Could a shooter get close?” × “Security failure?” × “Medical non-survival?”).  ￼
+        3.2	Assign rough probabilities or ranges to each piece using back-of-the-envelope logic.  ￼
+        3.3	Recombine (usually by multiplication or scenario trees)
+            to create an inside-view estimate that you will compare against the base rate.  ￼
 
     The model is expected to return JSON where each element describes a
     driver and its probability. The final element should represent the
@@ -167,32 +184,64 @@ def decompose_problem(question: Question) -> list[Any]:
 
 
 def gather_evidence(question: Question) -> list[Any]:
-    """Collect evidence relevant to the question."""
+    """Collect evidence relevant to the question.
+
+    4.1 Quick desk research.
+        Newsfeeds, SEC filings, event databases. Capture facts that materially change odds.
+    4.2 High-value data points.
+        Polls, market prices, expert testimony. Note likelihood ratios (how much more/less likely if fact is true?).
+    4.3 Reliability check.
+        Source reputation, recency. Tag each item with a credibility weight.
+
+    """
     raise NotImplementedError
 
 
 def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
-    """Update the prior probability based on evidence."""
+    """Update the prior probability based on evidence.
+    5.1 Translate each piece of evidence into a likelihood ratio (formal Bayes or an intuitive ×/÷).  ￼
+        5.2 Apply sequential updating to move your prior toward the inside-view figure from Step 3.
+        5.3 Document the math in two lines:
+            Prior → Posterior for binaries, or Prior distribution → Posterior distribution/credible interval for numerics.
+    """
     raise NotImplementedError
 
 
 def produce_forecast(probability: float) -> float:
-    """Produce the final forecast probability."""
+    """Produce the final forecast probability.
+    6.1 Binary Question
+        Report: single probability rounded to the nearest whole % (e.g., 11 %) and one-sentence rationale.
+
+    6.2 Continuous Question
+        Report: central range (e.g., 10th–90th or 5th–95th) plus a best-guess median/mean
+        (e.g., $20 B–$100 B, 90 % CI; median ≈ $50 B). Indicate any skew.
+        (Superforecasters favour log-normal or student-t for heavy-tailed economic variables.)
+    """
     raise NotImplementedError
 
 
 def sanity_checks(probability: float) -> None:
-    """Perform sanity and bias checks on the forecast."""
+    """Perform sanity and bias checks on the forecast.
+    7.1	Check against the base-rate anchor. If you moved > 4× in odds, be ready to justify.  ￼
+        7.2	Overconfidence sweep. Ask: Would I bet money at these odds?  ￼
+        7.3	Common cognitive traps checklist: availability, confirmation, wishful thinking.
+    """
     raise NotImplementedError
 
 
 def cross_validate(probability: float) -> None:
-    """Optional cross-validation with external sources."""
+    """Optional cross-validation with external sources.
+    8.1 Compare with prediction-market prices or crowd forecasts.
+        8.2 Score hypothetical accuracy (Brier) vs. alternative estimates for robustness.
+    """
     raise NotImplementedError
 
 
 def record_forecast(question: Question, probability: float) -> None:
-    """Record the forecast and related metadata."""
+    """Record the forecast and related metadata.
+    9.1 The final forecast and date.
+        9.2 Key assumptions, data sources, and Fermi breakdown.
+    """
     raise NotImplementedError
 
 
