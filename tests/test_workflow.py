@@ -102,24 +102,52 @@ def test_decompose_problem(mocker: MockerFixture) -> None:
     assert result == data
 
 
-def test_other_stubs() -> None:
+def test_gather_evidence(mocker: MockerFixture) -> None:
     q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
+    data = [
+        {"description": "expert comment", "likelihood_ratio": 2.0},
+    ]
+    chat_mock = mocker.patch("src.workflow.ollama.chat", return_value=fake_chat_response(data))
 
-    with pytest.raises(NotImplementedError):
-        gather_evidence(q)
+    result = gather_evidence(q)
+    chat_mock.assert_called_once()
+    assert result == data
 
-    base_rate = BaseRate(reference_class="example", frequency=0.1)
-    with pytest.raises(NotImplementedError):
-        update_prior(base_rate, [])
 
-    with pytest.raises(NotImplementedError):
-        produce_forecast(0.5)
+def test_update_prior() -> None:
+    base = BaseRate(reference_class="ex", frequency=0.2)
+    evidence = [
+        {"likelihood_ratio": 2.0},
+        {"likelihood_ratio": 0.5},
+    ]
+    result = update_prior(base, evidence)
+    assert result == pytest.approx(0.2)
 
-    with pytest.raises(NotImplementedError):
-        sanity_checks(0.5)
 
-    with pytest.raises(NotImplementedError):
-        cross_validate(0.5)
+def test_produce_forecast() -> None:
+    expected = 0.12
+    assert produce_forecast(0.123) == expected
+    with pytest.raises(ValueError):
+        produce_forecast(1.2)
 
-    with pytest.raises(NotImplementedError):
-        record_forecast(q, 0.5)
+
+def test_sanity_and_cross_validate() -> None:
+    sanity_checks(0.5)
+    cross_validate(0.5)
+
+    with pytest.raises(ValueError):
+        sanity_checks(-0.1)
+
+    with pytest.raises(ValueError):
+        cross_validate(1.1)
+
+
+def test_record_forecast(mocker: MockerFixture) -> None:
+    q = Question(reasoning="r", text="t")
+    m = mocker.mock_open()
+    open_mock = mocker.patch("src.workflow.open", m)
+    record_forecast(q, 0.5)
+    open_mock.assert_called_once_with("forecasts.jsonl", "a", encoding="utf-8")
+    handle = m()
+    expected = json.dumps({"question": q.text, "probability": 0.5}) + "\n"
+    handle.write.assert_called_once_with(expected)

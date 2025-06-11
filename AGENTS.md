@@ -10,6 +10,7 @@ This is a Python project that uses `ruff` for linting and formatting, `mypy` for
 *   **Clarity and Simplicity:** Write code that is easy to read and understand. Add comments for complex logic.
 *   **Naming Conventions:** Use descriptive and meaningful names for variables, functions, and classes. Follow PEP 8 naming conventions (e.g., `snake_case` for functions and variables, `PascalCase` for classes).
 *   **Known Issues:** Review `ISSUES.md` for previously encountered problems and their solutions before starting new work.
+*   **Issue Tracking:** Whenever you encounter a new problem and resolve it, document the details in `ISSUES.md` so future contributors can benefit.
 
 ## 3. Tooling and Commands
 

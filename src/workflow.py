@@ -193,22 +193,86 @@ def gather_evidence(question: Question) -> list[Any]:
     4.3 Reliability check.
         Source reputation, recency. Tag each item with a credibility weight.
 
+    This implementation relies on an LLM to return a concise list of evidence
+    items. Each evidence item should include a short description and may
+    optionally contain a ``likelihood_ratio`` field which is used later when
+    updating the prior.
+
+    Args:
+        question: The clarified forecasting question.
+
+    Returns:
+        A list of evidence dictionaries.
     """
-    raise NotImplementedError
+
+    system_prompt = (
+        "List key pieces of evidence that would influence the probability of the"
+        " following forecasting question. Return the result as a JSON list of"
+        " objects. Each object should include a 'description' field and may"
+        " include a numeric 'likelihood_ratio'."
+    )
+
+    response = ollama.chat(
+        model="llama3.3",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": question.text},
+        ],
+        format="json",
+        options={"temperature": 0},
+    )
+
+    content = response.message.content
+    if content is None:
+        raise ValueError("Model returned empty content")
+
+    data = json.loads(content)
+    if not isinstance(data, list):
+        raise ValueError("Model did not return a list")
+
+    return data
 
 
 def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
     """Update the prior probability based on evidence.
-    5.1 Translate each piece of evidence into a likelihood ratio (formal Bayes or an intuitive ×/÷).  ￼
+
+    5.1 Translate each piece of evidence into a likelihood ratio (formal Bayes or an intuitive ×/÷).
         5.2 Apply sequential updating to move your prior toward the inside-view figure from Step 3.
         5.3 Document the math in two lines:
-            Prior → Posterior for binaries, or Prior distribution → Posterior distribution/credible interval for numerics.
+            Prior → Posterior for binaries, or Prior distribution → Posterior
+            distribution/credible interval for numerics.
+
+    Evidence items may contain a ``likelihood_ratio`` key representing how much
+    the evidence shifts the odds. The prior is updated sequentially using these
+    ratios. Items lacking the key are ignored.
+
+    Args:
+        base_rate: The base rate prior information.
+        evidence: A list of evidence dictionaries.
+
+    Returns:
+        The posterior probability after applying all likelihood ratios.
     """
-    raise NotImplementedError
+
+    probability = base_rate.frequency
+    for item in evidence:
+        if isinstance(item, dict) and "likelihood_ratio" in item:
+            lr = float(item["likelihood_ratio"])
+            # Convert probability to odds, apply likelihood ratio, then
+            # convert back to probability.
+            if probability in (0.0, 1.0):
+                odds = float("inf") if probability == 1.0 else 0.0
+            else:
+                odds = probability / (1 - probability)
+            odds *= lr
+            probability = odds / (1 + odds) if odds != float("inf") else 1.0
+
+    return probability
 
 
 def produce_forecast(probability: float) -> float:
     """Produce the final forecast probability.
+
     6.1 Binary Question
         Report: single probability rounded to the nearest whole % (e.g., 11 %) and one-sentence rationale.
 
@@ -216,17 +280,45 @@ def produce_forecast(probability: float) -> float:
         Report: central range (e.g., 10th–90th or 5th–95th) plus a best-guess median/mean
         (e.g., $20 B–$100 B, 90 % CI; median ≈ $50 B). Indicate any skew.
         (Superforecasters favour log-normal or student-t for heavy-tailed economic variables.)
+
+    For this simplified implementation only binary questions are supported. The
+    probability is validated to be between ``0`` and ``1`` and then rounded to
+    two decimal places.
+
+    Args:
+        probability: Posterior probability from :func:`update_prior`.
+
+    Returns:
+        The rounded probability.
     """
-    raise NotImplementedError
+
+    if not 0 <= probability <= 1:
+        raise ValueError("Probability must be between 0 and 1")
+
+    return round(probability, 2)
 
 
 def sanity_checks(probability: float) -> None:
     """Perform sanity and bias checks on the forecast.
-    7.1	Check against the base-rate anchor. If you moved > 4× in odds, be ready to justify.  ￼
-        7.2	Overconfidence sweep. Ask: Would I bet money at these odds?  ￼
-        7.3	Common cognitive traps checklist: availability, confirmation, wishful thinking.
+
+    7.1 Check against the base-rate anchor. If you moved > 4× in odds, be ready to justify.
+        7.2 Overconfidence sweep. Ask: Would I bet money at these odds?
+        7.3 Common cognitive traps checklist: availability, confirmation, wishful thinking.
+
+    This simplified version only verifies that the probability is within ``[0, 1]``.
+    In a production system additional checks for common cognitive biases would be performed.
+
+    Args:
+        probability: Probability to validate.
+
+    Raises:
+        ValueError: If ``probability`` lies outside the allowed range.
     """
-    raise NotImplementedError
+
+    if not 0 <= probability <= 1:
+        raise ValueError("Probability must be between 0 and 1")
+
+    # No further action in this stub implementation.
 
 
 def cross_validate(probability: float) -> None:
@@ -234,15 +326,30 @@ def cross_validate(probability: float) -> None:
     8.1 Compare with prediction-market prices or crowd forecasts.
         8.2 Score hypothetical accuracy (Brier) vs. alternative estimates for robustness.
     """
-    raise NotImplementedError
+    if not 0 <= probability <= 1:
+        raise ValueError("Probability must be between 0 and 1")
+
+    # Placeholder for external cross-validation logic.
 
 
 def record_forecast(question: Question, probability: float) -> None:
     """Record the forecast and related metadata.
+
     9.1 The final forecast and date.
         9.2 Key assumptions, data sources, and Fermi breakdown.
+
+    The forecast is appended as a JSON line to ``forecasts.jsonl`` in the current
+    working directory. Each line contains the question text and the probability
+    value.
+
+    Args:
+        question: The clarified question being answered.
+        probability: The final forecast probability.
     """
-    raise NotImplementedError
+
+    entry = {"question": question.text, "probability": probability}
+    with open("forecasts.jsonl", "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry) + "\n")
 
 
 def run_workflow(question_text: str) -> float:
