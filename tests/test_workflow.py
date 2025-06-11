@@ -44,13 +44,36 @@ def test_clarify_question(mocker: MockerFixture) -> None:
     assert result.variable_type == data["variable_type"]
 
 
-def test_run_workflow_calls_clarify(mocker: MockerFixture) -> None:
+def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     q = Question(reasoning="r", text="t")
+    base_rate = BaseRate(reference_class="rc", frequency=0.1)
+    evidence: list[Any] = ["e1"]
+    prior = 0.2
+    probability = 0.3
+
     clarify_mock = mocker.patch("src.workflow.clarify_question", return_value=q)
+    base_mock = mocker.patch("src.workflow.set_base_rate", return_value=base_rate)
+    decomp_mock = mocker.patch("src.workflow.decompose_problem")
+    gather_mock = mocker.patch("src.workflow.gather_evidence", return_value=evidence)
+    update_mock = mocker.patch("src.workflow.update_prior", return_value=prior)
+    produce_mock = mocker.patch("src.workflow.produce_forecast", return_value=probability)
+    sanity_mock = mocker.patch("src.workflow.sanity_checks")
+    cross_mock = mocker.patch("src.workflow.cross_validate")
+    record_mock = mocker.patch("src.workflow.record_forecast")
 
     result = run_workflow("q")
+
     clarify_mock.assert_called_once_with("q")
-    assert result is q
+    base_mock.assert_called_once_with(q)
+    decomp_mock.assert_called_once_with(q)
+    gather_mock.assert_called_once_with(q)
+    update_mock.assert_called_once_with(base_rate, evidence)
+    produce_mock.assert_called_once_with(prior)
+    sanity_mock.assert_called_once_with(probability)
+    cross_mock.assert_called_once_with(probability)
+    record_mock.assert_called_once_with(q, probability)
+
+    assert result == probability
 
 
 def test_set_base_rate(mocker: MockerFixture) -> None:

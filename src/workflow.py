@@ -245,7 +245,35 @@ def record_forecast(question: Question, probability: float) -> None:
     raise NotImplementedError
 
 
-def run_workflow(question_text: str) -> Question:
-    """Run the forecasting workflow for a single question."""
+def run_workflow(question_text: str) -> float:
+    """Run the forecasting workflow for a single question.
 
-    return clarify_question(question_text)
+    The function executes each step of the forecasting workflow in order:
+
+    1. Clarify the question.
+    2. Determine the base rate.
+    3. Decompose the problem into drivers.
+    4. Gather current evidence.
+    5. Update the prior based on the evidence.
+    6. Produce the forecast.
+    7. Run sanity and bias checks.
+    8. Optionally cross‑validate.
+    9. Record the forecast.
+
+    Args:
+        question_text: The raw forecasting question.
+
+    Returns:
+        The final forecast probability.
+    """
+
+    question = clarify_question(question_text)
+    base_rate = set_base_rate(question)
+    decompose_problem(question)
+    evidence = gather_evidence(question)
+    prior = update_prior(base_rate, evidence)
+    probability = produce_forecast(prior)
+    sanity_checks(probability)
+    cross_validate(probability)
+    record_forecast(question, probability)
+    return probability

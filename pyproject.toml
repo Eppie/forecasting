@@ -9,6 +9,7 @@ dependencies = [
     "pydantic-settings>=2.1.0", # For config
     "pytest>=8.4.0",
     "pytest-mock>=3.14.1",
+    "pytest-cov>=4.1.0",
     "mypy>=1.0.0",
     "uv>=0.7.12", # Uv itself if managed globally or for CI
     "ruff>=0.11.13",
