@@ -152,10 +152,12 @@ class ContinuousDriver:
     low_value: float
     high_value: float
 
+
 @dataclass
 class DiscreteDriver:
     driver: str
     probability: float
+
 
 @dataclass
 class ProblemDecomposition:

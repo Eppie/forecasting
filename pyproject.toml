@@ -52,5 +52,6 @@ module = [
     "playwright.*",
     "brave_search_python_client.*",
     "psutil",
+    "requests",
 ]
 ignore_missing_imports = true
