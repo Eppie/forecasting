@@ -29,16 +29,18 @@ def fake_chat_response(data: Any) -> ollama.ChatResponse:
 
 def test_clarify_question(mocker: MockerFixture) -> None:
     data = {
-        "question": "Will AI reach AGI by 2030?",
+        "original_question": "Will AI reach AGI by 2030?",
         "reasoning": "Analyzing trends",
+        "text": "Will AI reach AGI by 2030?",
         "resolution_rule": "official announcement",
+        "end_date": "",
         "variable_type": "binary",
     }
     mocker.patch("src.workflow.ollama.chat", return_value=fake_chat_response(data))
 
     result = clarify_question("Will AI reach AGI by 2030?")
     assert isinstance(result, Question)
-    assert result.text == data["question"]
+    assert result.text == data["original_question"]
     assert result.reasoning == data["reasoning"]
     assert result.resolution_rule == data["resolution_rule"]
     assert result.variable_type == data["variable_type"]

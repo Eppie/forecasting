@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pprint import pprint
 from typing import Any
 
 import ollama
@@ -11,13 +12,15 @@ import ollama
 class Question:
     """Forecasting question details."""
 
+    original_question: str
     reasoning: str
-    text: str
-    resolution_rule: str | None = None
-    variable_type: str | None = None
+    resolution_rule: str
+    end_date: str
+    variable_type: str
+    clarified_question: str
 
 
-def clarify_question(question: str) -> Question:
+def clarify_question(question: str, verbose: bool = False) -> Question:
     """Return a ``Question`` object from raw text.
 
     1.1 Write the question verbatim.
@@ -30,24 +33,24 @@ def clarify_question(question: str) -> Question:
 
     Args:
         question: The question to clarify.
+        verbose: Whether to enable verbose output.
 
     Returns:
         A ``Question`` instance.
     """
     system_prompt = (
         "Clarify the following forecasting question."
-        " Provide JSON with fields 'question', 'reasoning',"
-        " 'resolution_rule', and 'variable_type'."
+        " Provide JSON with fields 'original_question', 'reasoning',"
+        " 'resolution_rule', 'end_date', 'variable_type', and 'clarified_question'."
     )
 
     response = ollama.chat(
-        model="llama3.3",
+        model="deepseek-r1:8b",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": question},
         ],
         format="json",
-        options={"temperature": 0},
     )
 
     content = response.message.content
@@ -55,28 +58,36 @@ def clarify_question(question: str) -> Question:
         raise ValueError("Model returned empty content")
     data = json.loads(content)
 
-    reasoning = str(data.get("reasoning", ""))
-    text = str(data.get("question", question))
+    original_question = data.get("original_question", question)
+    reasoning = data.get("reasoning", "")
     resolution_rule = data.get("resolution_rule")
+    end_date = data.get("end_date", "")
     variable_type = data.get("variable_type")
+    clarified_question = data.get("clarified_question", "")
 
-    return Question(
+    result = Question(
+        original_question=original_question,
         reasoning=reasoning,
-        text=text,
         resolution_rule=resolution_rule,
+        end_date=end_date,
         variable_type=variable_type,
+        clarified_question=clarified_question,
     )
+    if verbose:
+        pprint(result)
+    return result
 
 
 @dataclass
 class BaseRate:
     """Base rate prior information."""
 
+    reasoning: str
     reference_class: str
     frequency: float
 
 
-def set_base_rate(question: Question) -> BaseRate:
+def set_base_rate(clarified_question: str, verbose: bool = False) -> BaseRate:
     """Determine the base rate for a question.
 
     2.1 Identify a reference class.
@@ -93,26 +104,28 @@ def set_base_rate(question: Question) -> BaseRate:
     ``frequency``.
 
     Args:
-        question: The clarified forecasting question.
+        clarified_question: The clarified forecasting question.
+        verbose: Whether to enable verbose output.
 
     Returns:
         A :class:`BaseRate` with the reference class filled in and ``frequency``
         set to ``0.0`` until the next step is implemented.
     """
 
-    system_prompt = (
-        "Suggest an appropriate reference class for the following forecasting "
-        "question. Return JSON with a single field 'reference_class'."
-    )
+    system_prompt = """
+        Suggest an appropriate reference class for the following forecasting question.
+        Return JSON with two fields: 'reasoning', and 'reference_class'.
+        For example, if the question was "Will the US President be assassinated before the end of his term?"
+        then a reasonable reference class would be "percent of US presidents assassinated".
+        """
 
     response = ollama.chat(
-        model="llama3.3",
+        model="deepseek-r1:8b",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question.text},
+            {"role": "user", "content": clarified_question},
         ],
         format="json",
-        options={"temperature": 0},
     )
 
     content = response.message.content
@@ -120,16 +133,37 @@ def set_base_rate(question: Question) -> BaseRate:
         raise ValueError("Model returned empty content")
 
     data = json.loads(content)
+    reasoning = data.get("reasoning", "")
     reference_class = str(data.get("reference_class", ""))
 
     # TODO: implement measurement of historical frequency based on the chosen
     # reference class.
     frequency = 0.0
 
-    return BaseRate(reference_class=reference_class, frequency=frequency)
+    result = BaseRate(reasoning=reasoning, reference_class=reference_class, frequency=frequency)
+    if verbose:
+        pprint(result)
+    return result
 
 
-def decompose_problem(question: Question) -> list[Any]:
+@dataclass
+class ContinuousDriver:
+    driver: str
+    low_value: float
+    high_value: float
+
+@dataclass
+class DiscreteDriver:
+    driver: str
+    probability: float
+
+@dataclass
+class ProblemDecomposition:
+    reasoning: str
+    drivers: list[ContinuousDriver | DiscreteDriver]
+
+
+def decompose_problem(clarified_question: str, verbose: bool = False) -> list[Any]:
     """Break the question into smaller drivers.
 
     This step constructs an "inside view" by asking the model to:
@@ -144,32 +178,47 @@ def decompose_problem(question: Question) -> list[Any]:
     combined inside-view probability.
 
     Args:
-        question: The clarified forecasting question.
+        clarified_question: The clarified forecasting question.
+        verbose: Whether to enable verbose output.
 
     Returns:
         A list of driver descriptions with probabilities. The last element
         represents the combined inside-view estimate.
     """
 
-    system_prompt = (
-        'Break the event into independent drivers ("Could a shooter get close?"'
-        ' × "Security failure?" × "Medical non-survival?"). '
-        "Assign rough probabilities or ranges to each piece using back-of-the-envelope"
-        " logic. Recombine (usually by multiplication or scenario trees) to create"
-        " an inside-view estimate that you will compare against the base rate."
-        " Return the result as a JSON list of objects with fields 'driver' and"
-        " 'probability'. Include a final object with driver 'combined' containing"
-        " the inside-view probability."
-    )
+    system_prompt = """
+    @dataclass
+class ContinuousDriver:
+    driver: str
+    low_value: float
+    high_value: float
+
+@dataclass
+class DiscreteDriver:
+    driver: str
+    probability: float
+
+@dataclass
+class ProblemDecomposition:
+    reasoning: str
+    drivers: list[ContinuousDriver | DiscreteDriver]
+
+    Break the event into independent drivers ("Could a shooter get close?'
+     × "Security failure?" × "Medical non-survival?"). '
+    Assign rough probabilities or ranges to each piece using back-of-the-envelope
+     logic. Recombine (usually by multiplication or scenario trees) to create
+     an inside-view estimate that you will compare against the base rate.
+     Return the result as a JSON object of type ProblemDecomposition.
+     The user will now provide the question for you to decompose into drivers.
+    """
 
     response = ollama.chat(
-        model="llama3.3",
+        model="deepseek-r1:8b",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question.text},
+            {"role": "user", "content": clarified_question},
         ],
         format="json",
-        options={"temperature": 0},
     )
 
     content = response.message.content
@@ -177,13 +226,16 @@ def decompose_problem(question: Question) -> list[Any]:
         raise ValueError("Model returned empty content")
 
     data = json.loads(content)
+
+    if verbose:
+        pprint(data)
     if not isinstance(data, list):
         raise ValueError("Model did not return a list")
 
     return data
 
 
-def gather_evidence(question: Question) -> list[Any]:
+def gather_evidence(clarified_question: str, verbose: bool = False) -> list[Any]:
     """Collect evidence relevant to the question.
 
     4.1 Quick desk research.
@@ -199,7 +251,8 @@ def gather_evidence(question: Question) -> list[Any]:
     updating the prior.
 
     Args:
-        question: The clarified forecasting question.
+        clarified_question: The clarified forecasting question.
+        verbose: Whether to enable verbose output.
 
     Returns:
         A list of evidence dictionaries.
@@ -213,13 +266,12 @@ def gather_evidence(question: Question) -> list[Any]:
     )
 
     response = ollama.chat(
-        model="llama3.3",
+        model="deepseek-r1:8b",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question.text},
+            {"role": "user", "content": clarified_question},
         ],
         format="json",
-        options={"temperature": 0},
     )
 
     content = response.message.content
@@ -233,7 +285,7 @@ def gather_evidence(question: Question) -> list[Any]:
     return data
 
 
-def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
+def update_prior(base_rate: BaseRate, evidence: list[Any], verbose: bool = False) -> float:
     """Update the prior probability based on evidence.
 
     5.1 Translate each piece of evidence into a likelihood ratio (formal Bayes or an intuitive ×/÷).
@@ -249,6 +301,7 @@ def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
     Args:
         base_rate: The base rate prior information.
         evidence: A list of evidence dictionaries.
+        verbose: Whether to enable verbose output.
 
     Returns:
         The posterior probability after applying all likelihood ratios.
@@ -270,7 +323,7 @@ def update_prior(base_rate: BaseRate, evidence: list[Any]) -> float:
     return probability
 
 
-def produce_forecast(probability: float) -> float:
+def produce_forecast(probability: float, verbose: bool = False) -> float:
     """Produce the final forecast probability.
 
     6.1 Binary Question
@@ -287,6 +340,7 @@ def produce_forecast(probability: float) -> float:
 
     Args:
         probability: Posterior probability from :func:`update_prior`.
+        verbose: Whether to enable verbose output.
 
     Returns:
         The rounded probability.
@@ -298,7 +352,7 @@ def produce_forecast(probability: float) -> float:
     return round(probability, 2)
 
 
-def sanity_checks(probability: float) -> None:
+def sanity_checks(probability: float, verbose: bool = False) -> None:
     """Perform sanity and bias checks on the forecast.
 
     7.1 Check against the base-rate anchor. If you moved > 4× in odds, be ready to justify.
@@ -310,6 +364,7 @@ def sanity_checks(probability: float) -> None:
 
     Args:
         probability: Probability to validate.
+        verbose: Whether to enable verbose output.
 
     Raises:
         ValueError: If ``probability`` lies outside the allowed range.
@@ -321,10 +376,14 @@ def sanity_checks(probability: float) -> None:
     # No further action in this stub implementation.
 
 
-def cross_validate(probability: float) -> None:
+def cross_validate(probability: float, verbose: bool = False) -> None:
     """Optional cross-validation with external sources.
     8.1 Compare with prediction-market prices or crowd forecasts.
-        8.2 Score hypothetical accuracy (Brier) vs. alternative estimates for robustness.
+    8.2 Score hypothetical accuracy (Brier) vs. alternative estimates for robustness.
+
+    Args:
+        probability: Probability to validate.
+        verbose: Whether to enable verbose output.
     """
     if not 0 <= probability <= 1:
         raise ValueError("Probability must be between 0 and 1")
@@ -332,27 +391,28 @@ def cross_validate(probability: float) -> None:
     # Placeholder for external cross-validation logic.
 
 
-def record_forecast(question: Question, probability: float) -> None:
+def record_forecast(clarified_question: str, probability: float, verbose: bool = False) -> None:
     """Record the forecast and related metadata.
 
     9.1 The final forecast and date.
-        9.2 Key assumptions, data sources, and Fermi breakdown.
+    9.2 Key assumptions, data sources, and Fermi breakdown.
 
     The forecast is appended as a JSON line to ``forecasts.jsonl`` in the current
     working directory. Each line contains the question text and the probability
     value.
 
     Args:
-        question: The clarified question being answered.
+        clarified_question: The clarified question being answered.
         probability: The final forecast probability.
+        verbose: Whether to enable verbose output.
     """
 
-    entry = {"question": question.text, "probability": probability}
+    entry = {"question": clarified_question, "probability": probability}
     with open("forecasts.jsonl", "a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
 
 
-def run_workflow(question_text: str) -> float:
+def run_workflow(question_text: str, verbose: bool = False) -> float:
     """Run the forecasting workflow for a single question.
 
     The function executes each step of the forecasting workflow in order:
@@ -369,18 +429,19 @@ def run_workflow(question_text: str) -> float:
 
     Args:
         question_text: The raw forecasting question.
+        verbose: Whether to enable verbose output.
 
     Returns:
         The final forecast probability.
     """
 
-    question = clarify_question(question_text)
-    base_rate = set_base_rate(question)
-    decompose_problem(question)
-    evidence = gather_evidence(question)
-    prior = update_prior(base_rate, evidence)
-    probability = produce_forecast(prior)
-    sanity_checks(probability)
-    cross_validate(probability)
-    record_forecast(question, probability)
+    question = clarify_question(question_text, verbose)
+    base_rate = set_base_rate(question.clarified_question, verbose)
+    decompose_problem(question.clarified_question, verbose)
+    evidence = gather_evidence(question.clarified_question, verbose)
+    prior = update_prior(base_rate, evidence, verbose)
+    probability = produce_forecast(prior, verbose)
+    sanity_checks(probability, verbose)
+    cross_validate(probability, verbose)
+    record_forecast(question.clarified_question, probability, verbose)
     return probability

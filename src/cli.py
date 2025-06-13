@@ -2,7 +2,7 @@ from pprint import pprint
 
 import typer  # type: ignore
 
-from .workflow import run_workflow
+from workflow import run_workflow
 
 app = typer.Typer(help="CLI for forecasting questions")
 
@@ -16,7 +16,7 @@ def forecast(
     if verbose:
         typer.echo(f"Forecasting question: {question}")
 
-    result = run_workflow(question)
+    result = run_workflow(question, verbose)
     pprint(result)
 
 
