@@ -31,7 +31,7 @@ def test_clarify_question(mocker: MockerFixture) -> None:
     data = {
         "original_question": "Will AI reach AGI by 2030?",
         "reasoning": "Analyzing trends",
-        "text": "Will AI reach AGI by 2030?",
+        "clarified_question": "Will AI reach AGI by 2030?",
         "resolution_rule": "official announcement",
         "end_date": "",
         "variable_type": "binary",
@@ -40,15 +40,23 @@ def test_clarify_question(mocker: MockerFixture) -> None:
 
     result = clarify_question("Will AI reach AGI by 2030?")
     assert isinstance(result, Question)
-    assert result.text == data["original_question"]
+    assert result.original_question == data["original_question"]
     assert result.reasoning == data["reasoning"]
     assert result.resolution_rule == data["resolution_rule"]
     assert result.variable_type == data["variable_type"]
+    assert result.clarified_question == data["clarified_question"]
 
 
 def test_run_workflow_sequence(mocker: MockerFixture) -> None:
-    q = Question(reasoning="r", text="t")
-    base_rate = BaseRate(reference_class="rc", frequency=0.1)
+    q = Question(
+        original_question="oq",
+        reasoning="r",
+        resolution_rule="rr",
+        end_date="ed",
+        variable_type="binary",
+        clarified_question="cq",
+    )
+    base_rate = BaseRate(reasoning="", reference_class="rc", frequency=0.1)
     evidence: list[Any] = ["e1"]
     prior = 0.2
     probability = 0.3
@@ -56,7 +64,10 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     clarify_mock = mocker.patch("src.workflow.clarify_question", return_value=q)
     base_mock = mocker.patch("src.workflow.set_base_rate", return_value=base_rate)
     decomp_mock = mocker.patch("src.workflow.decompose_problem")
-    gather_mock = mocker.patch("src.workflow.gather_evidence", return_value=evidence)
+    gather_mock = mocker.patch(
+        "src.workflow.gather_evidence",
+        return_value=evidence,
+    )
     update_mock = mocker.patch("src.workflow.update_prior", return_value=prior)
     produce_mock = mocker.patch("src.workflow.produce_forecast", return_value=probability)
     sanity_mock = mocker.patch("src.workflow.sanity_checks")
@@ -65,23 +76,26 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
 
     result = run_workflow("q")
 
-    clarify_mock.assert_called_once_with("q")
-    base_mock.assert_called_once_with(q)
-    decomp_mock.assert_called_once_with(q)
-    gather_mock.assert_called_once_with(q)
-    update_mock.assert_called_once_with(base_rate, evidence)
-    produce_mock.assert_called_once_with(prior)
-    sanity_mock.assert_called_once_with(probability)
-    cross_mock.assert_called_once_with(probability)
-    record_mock.assert_called_once_with(q, probability)
+    clarify_mock.assert_called_once_with("q", False)
+    base_mock.assert_called_once_with(q.clarified_question, False)
+    decomp_mock.assert_called_once_with(q.clarified_question, False)
+    gather_mock.assert_called_once_with(q.clarified_question, False)
+    update_mock.assert_called_once_with(base_rate, evidence, False)
+    produce_mock.assert_called_once_with(prior, False)
+    sanity_mock.assert_called_once_with(probability, False)
+    cross_mock.assert_called_once_with(probability, False)
+    record_mock.assert_called_once_with(q.clarified_question, probability, False)
 
     assert result == probability
 
 
 def test_set_base_rate(mocker: MockerFixture) -> None:
-    q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
+    q = "Will AI achieve AGI by 2030?"
     data = {"reference_class": "past AGI timeline predictions"}
-    chat_mock = mocker.patch("src.workflow.ollama.chat", return_value=fake_chat_response(data))
+    chat_mock = mocker.patch(
+        "src.workflow.ollama.chat",
+        return_value=fake_chat_response(data),
+    )
 
     result = set_base_rate(q)
     chat_mock.assert_called_once()
@@ -91,7 +105,7 @@ def test_set_base_rate(mocker: MockerFixture) -> None:
 
 
 def test_decompose_problem(mocker: MockerFixture) -> None:
-    q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
+    q = "Will AI achieve AGI by 2030?"
     data = [
         {"driver": "Breakthrough in algorithms", "probability": 0.2},
         {"driver": "Hardware progress", "probability": 0.3},
@@ -105,7 +119,7 @@ def test_decompose_problem(mocker: MockerFixture) -> None:
 
 
 def test_gather_evidence(mocker: MockerFixture) -> None:
-    q = Question(reasoning="", text="Will AI achieve AGI by 2030?")
+    q = "Will AI achieve AGI by 2030?"
     data = [
         {"description": "expert comment", "likelihood_ratio": 2.0},
     ]
@@ -117,7 +131,7 @@ def test_gather_evidence(mocker: MockerFixture) -> None:
 
 
 def test_update_prior() -> None:
-    base = BaseRate(reference_class="ex", frequency=0.2)
+    base = BaseRate(reasoning="", reference_class="ex", frequency=0.2)
     evidence = [
         {"likelihood_ratio": 2.0},
         {"likelihood_ratio": 0.5},
@@ -145,11 +159,11 @@ def test_sanity_and_cross_validate() -> None:
 
 
 def test_record_forecast(mocker: MockerFixture) -> None:
-    q = Question(reasoning="r", text="t")
+    q = "t"
     m = mocker.mock_open()
     open_mock = mocker.patch("src.workflow.open", m)
     record_forecast(q, 0.5)
     open_mock.assert_called_once_with("forecasts.jsonl", "a", encoding="utf-8")
     handle = m()
-    expected = json.dumps({"question": q.text, "probability": 0.5}) + "\n"
+    expected = json.dumps({"question": q, "probability": 0.5}) + "\n"
     handle.write.assert_called_once_with(expected)

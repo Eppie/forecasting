@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import requests
+from typing import Any, cast
+
 import ollama
-from typing import Any
+import requests
 
 
 class LLMRouter:
@@ -24,11 +25,11 @@ class LLMRouter:
     _TIMEOUT = 30
 
     def __init__(
-            self,
-            model: str = "llama3",
-            llama_cpp_url: str = "http://localhost:8080/v1",
-            ollama_url: str = "http://localhost:11434/api/chat",
-            lmstudio_url: str = "http://localhost:1234/v1",
+        self,
+        model: str = "llama3",
+        llama_cpp_url: str = "http://localhost:8080/v1",
+        ollama_url: str = "http://localhost:11434/api/chat",
+        lmstudio_url: str = "http://localhost:1234/v1",
     ) -> None:
         self.model = model
         self.llama_cpp_url = llama_cpp_url.rstrip("/")
@@ -42,11 +43,11 @@ class LLMRouter:
         }
 
     def chat(
-            self,
-            messages: list[dict[str, str]],
-            *,
-            backend: str | None = None,
-            **kwargs: Any,
+        self,
+        messages: list[dict[str, str]],
+        *,
+        backend: str | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Return a chat completion.
 
@@ -58,13 +59,11 @@ class LLMRouter:
         RuntimeError
             When every selected engine is unreachable.
         """
-        order: list[str] = (
-            [backend] if backend else ["llama_cpp", "ollama", "lmstudio"]
-        )
+        order: list[str] = [backend] if backend else ["llama_cpp", "ollama", "lmstudio"]
         for name in order:
             print(f"Trying {name}")
             try:
-                return self._handlers[name](messages, **kwargs)
+                return cast(dict[str, Any], self._handlers[name](messages, **kwargs))
             except requests.exceptions.ConnectionError as e:
                 print(f"Error connecting to {name}\n Reason: {e}")
                 if backend:
@@ -94,11 +93,9 @@ class LLMRouter:
             content = raw["message"]["content"]
             role = raw["message"].get("role", "assistant")
             return {"choices": [{"message": {"role": role, "content": content}}]}
-        return raw
+        return cast(dict[str, Any], raw)
 
-    def _chat_llama_cpp(
-            self, messages: list[dict[str, str]], **kwargs: Any
-    ) -> dict[str, Any]:
+    def _chat_llama_cpp(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
         payload = {"model": self.model, "messages": messages} | kwargs
         resp = requests.post(
             f"{self.llama_cpp_url}{self._PATH_LLAMACPP}",
@@ -106,20 +103,16 @@ class LLMRouter:
             timeout=self._TIMEOUT,
         )
         resp.raise_for_status()
-        return self._normalize("openai", resp.json())
+        return self._normalize("openai", cast(Any, resp.json()))
 
-    def _chat_ollama(
-            self, messages: list[dict[str, str]], **kwargs: Any
-    ) -> dict[str, Any]:
+    def _chat_ollama(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
         """Chat using the local Ollama server via the official SDK."""
         payload: dict[str, Any] = {"model": self.model, "messages": messages} | kwargs
         payload.setdefault("stream", False)
         response = ollama.chat(**payload)
         return self._normalize("ollama", response)
 
-    def _chat_lmstudio(
-            self, messages: list[dict[str, str]], **kwargs: Any
-    ) -> dict[str, Any]:
+    def _chat_lmstudio(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:
         payload = {"model": self.model, "messages": messages} | kwargs
         resp = requests.post(
             f"{self.lmstudio_url}{self._PATH_LLAMACPP}",
@@ -127,14 +120,12 @@ class LLMRouter:
             timeout=self._TIMEOUT,
         )
         resp.raise_for_status()
-        return self._normalize("openai", resp.json())
+        return self._normalize("openai", cast(Any, resp.json()))
 
 
 if __name__ == "__main__":
     router = LLMRouter(model="qwen3:32b")
-    conversation = [
-        {"role": "user", "content": "Explain quantum entanglement in two sentences."}
-    ]
+    conversation = [{"role": "user", "content": "Explain quantum entanglement in two sentences."}]
 
     # Explicitly target Ollama (no fallback)
     try:
