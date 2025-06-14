@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
-from pprint import pprint
 from typing import Any
 
 import ollama
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -45,15 +47,15 @@ def clarify_question(question: str, verbose: bool = False) -> Question:
 
         Return an object with these keys (all required, no extras):
 
-        • original_question  – verbatim copy of the user's text  
+        • original_question  – verbatim copy of the user's text
         • reasoning          – detailed chain‑of‑thought (≈3–6 sentences) explaining how you derived the clarification and why each field is appropriate.
         • resolution_rule    – bullet-style rule that states what counts as YES/NO
           (or how the numeric outcome will be judged), the exact end date-time,
-          and at least one publicly checkable source  
-        • end_date           – ISO-8601 date-time, e.g. "2029-01-20T17:00:00Z"  
+          and at least one publicly checkable source
+        • end_date           – ISO-8601 date-time, e.g. "2029-01-20T17:00:00Z"
         • variable_type      – one of "binary", "count", "continuous"
         • clarified_question – rewritten so the outcome, metric, population, and
-          closing date are explicit and testable  
+          closing date are explicit and testable
 
         ### Few-shot examples
 
@@ -89,7 +91,7 @@ def clarify_question(question: str, verbose: bool = False) -> Question:
 
         ### Instructions
         1. Think step‑by‑step but return only the final JSON. Provide a *thorough* reasoning field as specified.
-        2. Choose exactly one variable_type.  
+        2. Choose exactly one variable_type.
         3. Use UTC for the end_date.
         """
 
@@ -122,8 +124,7 @@ def clarify_question(question: str, verbose: bool = False) -> Question:
         variable_type=variable_type,
         clarified_question=clarified_question,
     )
-    if verbose:
-        pprint(result)
+    logger.debug("%s", result)
     return result
 
 
@@ -159,6 +160,7 @@ def get_reference_classes(clarified_question: str, verbose: bool = False) -> lis
     Returns:
         A list of ReferenceClassItem (each with reasoning and reference_class).
     """
+
     system_prompt = """
     You are an expert super‑forecaster performing **Step 2.1 – Identify reference classes**.
     Given the clarified forecasting question below, output **ONLY valid JSON**: a top-level key called "reference_classes",
@@ -226,10 +228,9 @@ def get_reference_classes(clarified_question: str, verbose: bool = False) -> lis
     if content is None:
         raise ValueError("Model returned empty content")
     data = json.loads(content)
-    pprint(data)
+    logger.debug("%s", data)
     items = [ReferenceClassItem(**item) for item in data["reference_classes"]]
-    if verbose:
-        pprint(items)
+    logger.debug("%s", items)
     return items
 
 
@@ -333,8 +334,7 @@ class ProblemDecomposition:
 
     data = json.loads(content)
 
-    if verbose:
-        pprint(data)
+    logger.debug("%s", data)
     if not isinstance(data, list):
         raise ValueError("Model did not return a list")
 

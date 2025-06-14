@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, cast
 
 import ollama
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class LLMRouter:
@@ -61,11 +64,11 @@ class LLMRouter:
         """
         order: list[str] = [backend] if backend else ["llama_cpp", "ollama", "lmstudio"]
         for name in order:
-            print(f"Trying {name}")
+            logger.debug("Trying %s", name)
             try:
                 return cast(dict[str, Any], self._handlers[name](messages, **kwargs))
             except requests.exceptions.ConnectionError as e:
-                print(f"Error connecting to {name}\n Reason: {e}")
+                logger.warning("Error connecting to %s\n Reason: %s", name, e)
                 if backend:
                     raise RuntimeError(f"{name} back-end is unreachable") from None
                 continue
@@ -129,11 +132,11 @@ if __name__ == "__main__":
 
     # Explicitly target Ollama (no fallback)
     try:
-        print("—Ollama—")
-        print(router.chat(conversation, backend="ollama")["choices"][0]["message"]["content"])
+        logger.info("—Ollama—")
+        logger.info(router.chat(conversation, backend="ollama")["choices"][0]["message"]["content"])
     except RuntimeError as err:
-        print(f"Ollama unreachable: {err}")
+        logger.error("Ollama unreachable: %s", err)
 
     # Let the router fall back automatically
-    print("\n—Automatic fallback—")
-    print(router.chat(conversation)["choices"][0]["message"]["content"])
+    logger.info("\n—Automatic fallback—")
+    logger.info(router.chat(conversation)["choices"][0]["message"]["content"])

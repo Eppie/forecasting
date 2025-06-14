@@ -20,6 +20,7 @@ from src import (
     sanity_checks,
     update_prior,
 )
+from src.workflow import ReferenceClassItem, get_reference_classes
 
 
 def fake_chat_response(data: Any) -> ollama.ChatResponse:
@@ -46,6 +47,21 @@ def test_clarify_question(mocker: MockerFixture) -> None:
     assert result.clarified_question == data["clarified_question"]
 
 
+def test_get_reference_classes(mocker: MockerFixture) -> None:
+    q = "Will AI achieve AGI by 2030?"
+    data = {
+        "reference_classes": [
+            {"reasoning": "r", "reference_class": "past"},
+        ]
+    }
+    chat_mock = mocker.patch("src.workflow.ollama.chat", return_value=fake_chat_response(data))
+
+    result = get_reference_classes(q)
+
+    chat_mock.assert_called_once()
+    assert result == [ReferenceClassItem(reasoning="r", reference_class="past")]
+
+
 def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     q = Question(
         original_question="oq",
@@ -61,6 +77,11 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     probability = 0.3
 
     clarify_mock = mocker.patch("src.workflow.clarify_question", return_value=q)
+    ref_mock = mocker.patch(
+        "src.workflow.get_reference_classes",
+        return_value=[ReferenceClassItem(reasoning="", reference_class="rc")],
+    )
+    base_mock = mocker.patch("src.workflow.get_base_rate", return_value=base_rate)
     decomp_mock = mocker.patch("src.workflow.decompose_problem")
     gather_mock = mocker.patch(
         "src.workflow.gather_evidence",
@@ -75,6 +96,8 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     result = run_workflow("q")
 
     clarify_mock.assert_called_once_with("q", False)
+    ref_mock.assert_called_once_with(q.clarified_question, False)
+    base_mock.assert_called_once_with(q.clarified_question, ref_mock.return_value, False)
     decomp_mock.assert_called_once_with(q.clarified_question, False)
     gather_mock.assert_called_once_with(q.clarified_question, False)
     update_mock.assert_called_once_with(base_rate, evidence, False)
