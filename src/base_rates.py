@@ -29,9 +29,9 @@ from pprint import pprint
 from typing import Any
 
 import ollama
+import requests
 
 logger = logging.getLogger(__name__)
-import requests
 
 _CACHE_PATH = Path(__file__).with_suffix(".cache.sqlite")
 _conn = sqlite3.connect(_CACHE_PATH)
@@ -261,7 +261,7 @@ def generate_queries(
     return list(dict.fromkeys(queries))  # preserve order, drop dups
 
 
-def gather_documents_for_reference(
+def gather_documents_for_reference(  # noqa: PLR0913
     clarified_question: str,
     ref_item: ReferenceClassItem,
     *,
@@ -423,7 +423,7 @@ if __name__ == "__main__":
             "companies that have experienced similar growth "
             "stages or market conditions to capture "
             "analogous financial development patterns.",
-            reference_class="Annual revenues of AI-focused technology " "companies during their high-growth phase",
+            reference_class="Annual revenues of AI-focused technology companies during their high-growth phase",
         ),
         ReferenceClassItem(
             reasoning="To account for the broader economic context, we "
@@ -431,9 +431,7 @@ if __name__ == "__main__":
             "over time as they reflect industry-wide trends "
             "and cyclical factors that might influence "
             "OpenAI's performance.",
-            reference_class="Annual revenues of leading tech companies "
-            "(e.g., Google, Microsoft) from 2015 to "
-            "present",
+            reference_class="Annual revenues of leading tech companies (e.g., Google, Microsoft) from 2015 to present",
         ),
         ReferenceClassItem(
             reasoning="Since the target is revenue growth in a "
