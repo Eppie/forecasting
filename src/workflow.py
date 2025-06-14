@@ -7,8 +7,9 @@ from typing import Any
 
 import ollama
 
+from base_rates import get_base_rates  # type: ignore
+
 logger = logging.getLogger(__name__)
-from base_rates import get_base_rates
 
 
 @dataclass

@@ -2,29 +2,34 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-from pytest_mock import MockerFixture  # type: ignore
+playwright_module = ModuleType("playwright")
+sync_api_module = ModuleType("playwright.sync_api")
+sync_api_module.sync_playwright = MagicMock()  # type: ignore[attr-defined]
+playwright_module.sync_api = sync_api_module  # type: ignore[attr-defined]
+sys.modules.setdefault("playwright", playwright_module)
+sys.modules.setdefault("playwright.sync_api", sync_api_module)
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
-from src.tools.fetch_page import fetch_page
+from src.tools.fetch_page import fetch_page  # noqa: E402
 
 
-def test_fetch_page(mocker: MockerFixture) -> None:
-    page = mocker.Mock()
+def test_fetch_page() -> None:
+    page = MagicMock()
     page.content.return_value = "<html></html>"
 
-    browser = mocker.Mock()
+    browser = MagicMock()
     browser.new_page.return_value = page
 
-    pw = SimpleNamespace(chromium=SimpleNamespace(launch=mocker.Mock(return_value=browser)))
-    cm = mocker.MagicMock()
+    pw = SimpleNamespace(chromium=SimpleNamespace(launch=MagicMock(return_value=browser)))
+    cm = MagicMock()
     cm.__enter__.return_value = pw
     cm.__exit__.return_value = False
 
-    mocker.patch("src.tools.fetch_page.sync_playwright", return_value=cm)
-
-    result = fetch_page("http://example.com")
+    with patch("src.tools.fetch_page.sync_playwright", return_value=cm):
+        result = fetch_page("http://example.com")
 
     assert result == "<html></html>"
     page.goto.assert_called_once_with("http://example.com")
