@@ -18,7 +18,6 @@ from src import (
     record_forecast,
     run_workflow,
     sanity_checks,
-    set_base_rate,
     update_prior,
 )
 
@@ -62,7 +61,6 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     probability = 0.3
 
     clarify_mock = mocker.patch("src.workflow.clarify_question", return_value=q)
-    base_mock = mocker.patch("src.workflow.set_base_rate", return_value=base_rate)
     decomp_mock = mocker.patch("src.workflow.decompose_problem")
     gather_mock = mocker.patch(
         "src.workflow.gather_evidence",
@@ -77,7 +75,6 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     result = run_workflow("q")
 
     clarify_mock.assert_called_once_with("q", False)
-    base_mock.assert_called_once_with(q.clarified_question, False)
     decomp_mock.assert_called_once_with(q.clarified_question, False)
     gather_mock.assert_called_once_with(q.clarified_question, False)
     update_mock.assert_called_once_with(base_rate, evidence, False)
@@ -87,21 +84,6 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     record_mock.assert_called_once_with(q.clarified_question, probability, False)
 
     assert result == probability
-
-
-def test_set_base_rate(mocker: MockerFixture) -> None:
-    q = "Will AI achieve AGI by 2030?"
-    data = {"reference_class": "past AGI timeline predictions"}
-    chat_mock = mocker.patch(
-        "src.workflow.ollama.chat",
-        return_value=fake_chat_response(data),
-    )
-
-    result = set_base_rate(q)
-    chat_mock.assert_called_once()
-    assert isinstance(result, BaseRate)
-    assert result.reference_class == data["reference_class"]
-    assert result.frequency == 0.0
 
 
 def test_decompose_problem(mocker: MockerFixture) -> None:

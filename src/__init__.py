@@ -12,7 +12,6 @@ from .workflow import (
     record_forecast,
     run_workflow,
     sanity_checks,
-    set_base_rate,
     update_prior,
 )
 
@@ -22,7 +21,6 @@ __all__ = [
     "Question",
     "BaseRate",
     "clarify_question",
-    "set_base_rate",
     "decompose_problem",
     "gather_evidence",
     "update_prior",
