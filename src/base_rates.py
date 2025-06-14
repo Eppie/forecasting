@@ -19,16 +19,22 @@ The code avoids asyncio for simplicity, per user instruction.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from pprint import pprint
 from typing import Any
 
 import ollama
 import requests
+
+# --------------------------------------------------------------------------- #
+#  Logging
+# --------------------------------------------------------------------------- #
+
+logger = logging.getLogger(__name__)
 
 # --------------------------------------------------------------------------- #
 #  Persistent on-disk cache (SQLite)                                          #
@@ -285,8 +291,7 @@ def gather_documents_for_reference(  # noqa: PLR0913
     """
 
     queries = generate_queries(clarified_question, ref_item)
-    if verbose:
-        print("Generated queries:", queries)
+    logger.debug("Generated queries: %s", queries)
 
     all_urls: list[str] = []
     for q in queries:
@@ -294,8 +299,7 @@ def gather_documents_for_reference(  # noqa: PLR0913
             urls = run_brave_search(q, api_key=brave_api_key, top_k=search_top_k)
             all_urls.extend(urls)
         except Exception as exc:
-            if verbose:
-                print(f"Brave search failed for query '{q}': {exc}")
+            logger.debug("Brave search failed for query '%s': %s", q, exc)
 
     # Deduplicate while preserving order
     seen = set()
@@ -304,12 +308,14 @@ def gather_documents_for_reference(  # noqa: PLR0913
         if u not in seen:
             seen.add(u)
             unique_urls.append(u)
-    if verbose:
-        print(f"Fetched {len(unique_urls)} unique URLs.")
+    logger.debug("Fetched %s unique URLs.", len(unique_urls))
 
     docs = fetch_docs(unique_urls, api_key=jina_api_key)
-    if verbose:
-        print(f"Retrieved {sum(bool(d) for d in docs)}/{len(docs)} documents with non‑empty content.")
+    logger.debug(
+        "Retrieved %s/%s documents with non-empty content.",
+        sum(bool(d) for d in docs),
+        len(docs),
+    )
     return docs
 
 
@@ -415,8 +421,7 @@ def get_base_rates(
             quality_score=data.get("quality_score"),
         )
         base_rates.append(base_rate)
-        if verbose:
-            pprint(base_rate)
-            print("-" * 80)
+        logger.debug("%s", base_rate)
+        logger.debug("-" * 80)
 
     return base_rates
