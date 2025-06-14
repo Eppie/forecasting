@@ -25,27 +25,19 @@ import sqlite3
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from pprint import pprint
 from typing import Any
 
 import ollama
-import requests
-
-# --------------------------------------------------------------------------- #
-#  Logging
-# --------------------------------------------------------------------------- #
 
 logger = logging.getLogger(__name__)
-
-# --------------------------------------------------------------------------- #
-#  Persistent on-disk cache (SQLite)                                          #
-# --------------------------------------------------------------------------- #
+import requests
 
 _CACHE_PATH = Path(__file__).with_suffix(".cache.sqlite")
 _conn = sqlite3.connect(_CACHE_PATH)
 _conn.execute("CREATE TABLE IF NOT EXISTS brave_cache (query TEXT PRIMARY KEY, json TEXT)")
 _conn.execute("CREATE TABLE IF NOT EXISTS doc_cache (url TEXT PRIMARY KEY, content TEXT)")
 _conn.commit()
-
 
 # Common constants
 _HTTP_OK = 200
@@ -204,22 +196,20 @@ def _call_llm_json(system_prompt: str, user_prompt: str, model: str = "deepseek-
                 {"role": "user", "content": user_prompt},
             ],
             format="json",
-            options={"temperature": 0},
         )
         content = response.message.content if response and response.message else None
         if not content:
             time.sleep(0.5)
+            print("Empty content, trying again...")
             continue
         try:
             return json.loads(content)
         except json.JSONDecodeError:
             # Ask the model to fix formatting and retry.
+            print("Failed to decode JSON, trying again...")
             user_prompt = f"Your previous reply was not valid JSON. Please return ONLY JSON.\n\n{content}"
             time.sleep(0.5)
     raise ValueError("LLM failed to return valid JSON after retries.")
-
-
-# --------------------------- Query Generation & Fetch --------------------------- #
 
 
 def generate_queries(
@@ -239,7 +229,7 @@ def generate_queries(
     sys_prompt = """
     You are a research assistant skilled at forming precise web‑search queries.
     Given a clarified forecasting question and a reference class, output ONLY
-    a JSON array of up to 5 search strings (no additional keys, no prose).
+    a JSON array of UP TO 5 search strings (no additional keys, no prose).
     Each string should be targeted to find numerical counts or datasets that
     would let a researcher measure the base rate for that reference class.
 
@@ -249,32 +239,29 @@ def generate_queries(
     RefClass : Atlantic Category 5 hurricanes 1924‑2024
 
     Output:
+    { "queries":
     [
       "Atlantic Category 5 hurricanes list 1924 site:noaa.gov",
       "number of category 5 atlantic hurricanes since 1900",
       "NOAA best track dataset category 5 Atlantic"
-    ]
+    ] }
     """
 
     user_prompt = (
-        f"Clarified question: {clarified_question}\n"
-        f"Reference class: {ref_item.reference_class}\n"
+        f"Clarified question: ```{clarified_question}```\n"
+        f"Reference class: ```{ref_item}```\n"
         f"Please generate {n_queries} useful search queries."
     )
 
     data = _call_llm_json(sys_prompt, user_prompt, model=model)
-    if not isinstance(data, list):
-        raise ValueError("LLM did not return a JSON array of strings")
     queries: list[str] = []
-    for q in data:
+    for q in data["queries"]:
         if isinstance(q, str) and q.strip():
             queries.append(q.strip())
-            if len(queries) >= n_queries:
-                break
     return list(dict.fromkeys(queries))  # preserve order, drop dups
 
 
-def gather_documents_for_reference(  # noqa: PLR0913
+def gather_documents_for_reference(
     clarified_question: str,
     ref_item: ReferenceClassItem,
     *,
@@ -343,7 +330,7 @@ def get_base_rates(
     clarified_question:
         The fully clarified forecasting question (Step 1 output).
     ref_classes:
-        Candidate reference classes from Step  2.1.
+        Candidate reference classes from Step 2.1.
     verbose:
         If *True*, pretty‑print each BaseRate.
 
@@ -403,8 +390,8 @@ def get_base_rates(
 
     for ref_item in ref_classes:
         user_prompt = (
-            f"Clarified question: {clarified_question}\n\n"
-            f"Reference class description: {ref_item.reference_class}\n\n"
+            f"Clarified question: ```{clarified_question}```\n\n"
+            f"Reference class description: ```{ref_item.reference_class}```\n\n"
             f"Please measure the base rate for this class."
         )
 
@@ -425,3 +412,45 @@ def get_base_rates(
         logger.debug("-" * 80)
 
     return base_rates
+
+
+if __name__ == "__main__":
+    reference_classes = [
+        ReferenceClassItem(
+            reasoning="The target event is about forecasting OpenAI's "
+            "annual revenue in a specific future year. A "
+            "good reference class would be all public "
+            "companies that have experienced similar growth "
+            "stages or market conditions to capture "
+            "analogous financial development patterns.",
+            reference_class="Annual revenues of AI-focused technology " "companies during their high-growth phase",
+        ),
+        ReferenceClassItem(
+            reasoning="To account for the broader economic context, we "
+            "can consider major tech company annual revenues "
+            "over time as they reflect industry-wide trends "
+            "and cyclical factors that might influence "
+            "OpenAI's performance.",
+            reference_class="Annual revenues of leading tech companies "
+            "(e.g., Google, Microsoft) from 2015 to "
+            "present",
+        ),
+        ReferenceClassItem(
+            reasoning="Since the target is revenue growth in a "
+            "specific fiscal year, looking at historical "
+            "data for AI-related businesses or startups that "
+            "have reached significant scale can provide "
+            "insights into scaling patterns.",
+            reference_class="Annual revenues of companies with similar "
+            "market capitalization trajectory to "
+            "OpenAI over the last decade",
+        ),
+    ]
+
+    all_queries = []
+    for ref_item in reference_classes:
+        queries = generate_queries(
+            "What will be OpenAI's total revenue for the fiscal year ending December 31, 2027?", ref_item, n_queries=1
+        )
+        pprint(queries)
+        all_queries.extend(queries)

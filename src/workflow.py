@@ -8,6 +8,7 @@ from typing import Any
 import ollama
 
 logger = logging.getLogger(__name__)
+from base_rates import get_base_rates
 
 
 @dataclass
@@ -234,23 +235,6 @@ def get_reference_classes(clarified_question: str, verbose: bool = False) -> lis
     return items
 
 
-def get_base_rate(clarified_question: str, ref_classes: list[ReferenceClassItem], verbose: bool = False) -> BaseRate:
-    """Determine the base rate for a reference class.
-
-    2.2	Measure historical frequency or distribution.
-        For binaries, convert to a %; for numerics, fit a simple distribution (median, 5th/95th-percentiles).
-
-    Args:
-        clarified_question: The clarified forecasting question.
-        ref_classes: The list of candidate reference classes.
-        verbose: Whether to enable verbose output.
-
-    Returns:
-        BaseRate object.
-    """
-    return BaseRate(reasoning="", reference_class="rc", frequency=0.1)
-
-
 @dataclass
 class ContinuousDriver:
     driver: str
@@ -391,21 +375,21 @@ def gather_evidence(clarified_question: str, verbose: bool = False) -> list[Any]
     return data
 
 
-def update_prior(base_rate: BaseRate, evidence: list[Any], verbose: bool = False) -> float:
+def update_prior(base_rates: list[BaseRate], evidence: list[Any], verbose: bool = False) -> float:
     """Update the prior probability based on evidence.
 
     5.1 Translate each piece of evidence into a likelihood ratio (formal Bayes or an intuitive ×/÷).
-        5.2 Apply sequential updating to move your prior toward the inside-view figure from Step 3.
-        5.3 Document the math in two lines:
-            Prior → Posterior for binaries, or Prior distribution → Posterior
-            distribution/credible interval for numerics.
+    5.2 Apply sequential updating to move your prior toward the inside-view figure from Step 3.
+    5.3 Document the math in two lines:
+        Prior → Posterior for binaries, or Prior distribution → Posterior
+        distribution/credible interval for numerics.
 
     Evidence items may contain a ``likelihood_ratio`` key representing how much
     the evidence shifts the odds. The prior is updated sequentially using these
     ratios. Items lacking the key are ignored.
 
     Args:
-        base_rate: The base rate prior information.
+        base_rates: The base rates prior information.
         evidence: A list of evidence dictionaries.
         verbose: Whether to enable verbose output.
 
@@ -413,20 +397,23 @@ def update_prior(base_rate: BaseRate, evidence: list[Any], verbose: bool = False
         The posterior probability after applying all likelihood ratios.
     """
 
-    probability = base_rate.frequency
-    for item in evidence:
-        if isinstance(item, dict) and "likelihood_ratio" in item:
-            lr = float(item["likelihood_ratio"])
-            # Convert probability to odds, apply likelihood ratio, then
-            # convert back to probability.
-            if probability in (0.0, 1.0):
-                odds = float("inf") if probability == 1.0 else 0.0
-            else:
-                odds = probability / (1 - probability)
-            odds *= lr
-            probability = odds / (1 + odds) if odds != float("inf") else 1.0
+    probabilities = []
+    for base_rate in base_rates:
+        probability = base_rate.frequency
+        for item in evidence:
+            if isinstance(item, dict) and "likelihood_ratio" in item:
+                lr = float(item["likelihood_ratio"])
+                # Convert probability to odds, apply likelihood ratio, then
+                # convert back to probability.
+                if probability in (0.0, 1.0):
+                    odds = float("inf") if probability == 1.0 else 0.0
+                else:
+                    odds = probability / (1 - probability)
+                odds *= lr
+                probability = odds / (1 + odds) if odds != float("inf") else 1.0
+        probabilities.append(probability)
 
-    return probability
+    return sum(probabilities) / len(probabilities)
 
 
 def produce_forecast(probability: float, verbose: bool = False) -> float:
@@ -546,11 +533,12 @@ def run_workflow(question_text: str, verbose: bool = False) -> float:
     # clarified_question = "What will be OpenAI's total revenue for the fiscal year ending December 31, 2027?"
     ref_classes = get_reference_classes(clarified_question, verbose)
     # TODO: pass one of these to get_base_rate when implemented
-    base_rate = get_base_rate(clarified_question, ref_classes, verbose)
+    base_rates = get_base_rates(clarified_question, ref_classes)
+
     decompose_problem(clarified_question, verbose)
     evidence = gather_evidence(clarified_question, verbose)
     # The following will error unless base_rate is set, but we leave the workflow structure.
-    prior = update_prior(base_rate, evidence, verbose)
+    prior = update_prior(base_rates, evidence, verbose)
     probability = produce_forecast(prior, verbose)
     sanity_checks(probability, verbose)
     cross_validate(probability, verbose)

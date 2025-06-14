@@ -1,6 +1,5 @@
 """Public API for the forecasting package."""
 
-from .ollama_utils import execute_tool_calls, generate_search_queries
 from .workflow import (
     BaseRate,
     Question,
@@ -16,8 +15,6 @@ from .workflow import (
 )
 
 __all__ = [
-    "generate_search_queries",
-    "execute_tool_calls",
     "Question",
     "BaseRate",
     "clarify_question",

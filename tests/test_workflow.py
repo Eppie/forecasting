@@ -71,7 +71,7 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
         variable_type="binary",
         clarified_question="cq",
     )
-    base_rate = BaseRate(reasoning="", reference_class="rc", frequency=0.1)
+    base_rates = [BaseRate(reasoning="", reference_class="rc", frequency=0.1)]
     evidence: list[Any] = ["e1"]
     prior = 0.2
     probability = 0.3
@@ -81,7 +81,7 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
         "src.workflow.get_reference_classes",
         return_value=[ReferenceClassItem(reasoning="", reference_class="rc")],
     )
-    base_mock = mocker.patch("src.workflow.get_base_rate", return_value=base_rate)
+    base_mock = mocker.patch("src.base_rates.get_base_rate", return_value=base_rates)
     decomp_mock = mocker.patch("src.workflow.decompose_problem")
     gather_mock = mocker.patch(
         "src.workflow.gather_evidence",
@@ -100,7 +100,7 @@ def test_run_workflow_sequence(mocker: MockerFixture) -> None:
     base_mock.assert_called_once_with(q.clarified_question, ref_mock.return_value, False)
     decomp_mock.assert_called_once_with(q.clarified_question, False)
     gather_mock.assert_called_once_with(q.clarified_question, False)
-    update_mock.assert_called_once_with(base_rate, evidence, False)
+    update_mock.assert_called_once_with(base_rates, evidence, False)
     produce_mock.assert_called_once_with(prior, False)
     sanity_mock.assert_called_once_with(probability, False)
     cross_mock.assert_called_once_with(probability, False)
@@ -136,12 +136,12 @@ def test_gather_evidence(mocker: MockerFixture) -> None:
 
 
 def test_update_prior() -> None:
-    base = BaseRate(reasoning="", reference_class="ex", frequency=0.2)
+    base_rates = [BaseRate(reasoning="", reference_class="ex", frequency=0.2)]
     evidence = [
         {"likelihood_ratio": 2.0},
         {"likelihood_ratio": 0.5},
     ]
-    result = update_prior(base, evidence)
+    result = update_prior(base_rates, evidence)
     assert result == pytest.approx(0.2)
 
 
