@@ -23,13 +23,14 @@ import logging
 import os
 import sqlite3
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from pprint import pprint
 from typing import Any
 
 import ollama
 import requests
+
+from .models import BaseRate, ReferenceClassItem
 
 logger = logging.getLogger(__name__)
 
@@ -166,24 +167,6 @@ def fetch_docs(urls: list[str], *, api_key: str | None = None) -> list[str]:
             texts.append("")
             _cache_set("doc_cache", u, "")
     return texts
-
-
-@dataclass
-class ReferenceClassItem:
-    reasoning: str
-    reference_class: str
-
-
-@dataclass
-class BaseRate:
-    reference_class: str
-    reasoning: str
-    numerator: int | None = None
-    denominator: int | None = None
-    frequency: float | None = None  # 0‑1 for binary / proportion
-    distribution: dict[str, float] | None = None  # median/p5/p95 for continuous
-    lambda_: float | None = None  # Poisson rate for discrete counts
-    quality_score: float | None = None  # crude 0‑1 confidence
 
 
 def _call_llm_json(system_prompt: str, user_prompt: str, model: str = "deepseek-r1:8b", retries: int = 3) -> Any:

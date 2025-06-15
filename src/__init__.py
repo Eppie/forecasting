@@ -1,8 +1,7 @@
 """Public API for the forecasting package."""
 
+from .models import BaseRate, Question, ReferenceClassItem
 from .workflow import (
-    BaseRate,
-    Question,
     clarify_question,
     cross_validate,
     decompose_problem,
@@ -17,6 +16,7 @@ from .workflow import (
 __all__ = [
     "Question",
     "BaseRate",
+    "ReferenceClassItem",
     "clarify_question",
     "decompose_problem",
     "gather_evidence",
