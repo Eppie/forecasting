@@ -4,7 +4,7 @@ import logging
 
 import typer  # type: ignore
 
-from workflow import run_workflow
+from .workflow import run_workflow
 
 
 def _setup_logging(verbose: bool) -> None:

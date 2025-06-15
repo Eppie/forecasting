@@ -2,26 +2,19 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
 from typing import Any
 
 import ollama
 
-from base_rates import get_base_rates  # type: ignore
+from .base_rates import get_base_rates  # type: ignore
+from .models import (
+    BaseRate,
+    ProblemDecomposition,
+    Question,
+    ReferenceClassItem,
+)
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class Question:
-    """Forecasting question details."""
-
-    original_question: str
-    reasoning: str
-    resolution_rule: str
-    end_date: str
-    variable_type: str
-    clarified_question: str
 
 
 def clarify_question(question: str, verbose: bool = False) -> Question:
@@ -130,23 +123,6 @@ def clarify_question(question: str, verbose: bool = False) -> Question:
     return result
 
 
-@dataclass
-class BaseRate:
-    """Base rate prior information."""
-
-    reasoning: str
-    reference_class: str
-    frequency: float
-
-
-@dataclass
-class ReferenceClassItem:
-    """Single candidate reference class with justification."""
-
-    reasoning: str
-    reference_class: str
-
-
 def get_reference_classes(clarified_question: str, verbose: bool = False) -> list[ReferenceClassItem]:
     """
     Step 2.1 — Identify reference classes.
@@ -234,25 +210,6 @@ def get_reference_classes(clarified_question: str, verbose: bool = False) -> lis
     items = [ReferenceClassItem(**item) for item in data["reference_classes"]]
     logger.debug("%s", items)
     return items
-
-
-@dataclass
-class ContinuousDriver:
-    driver: str
-    low_value: float
-    high_value: float
-
-
-@dataclass
-class DiscreteDriver:
-    driver: str
-    probability: float
-
-
-@dataclass
-class ProblemDecomposition:
-    reasoning: str
-    drivers: list[ContinuousDriver | DiscreteDriver]
 
 
 def decompose_problem(clarified_question: str, verbose: bool = False) -> list[ProblemDecomposition]:
@@ -400,7 +357,7 @@ def update_prior(base_rates: list[BaseRate], evidence: list[Any], verbose: bool 
 
     probabilities = []
     for base_rate in base_rates:
-        probability = base_rate.frequency
+        probability = float(base_rate.frequency or 0.0)
         for item in evidence:
             if isinstance(item, dict) and "likelihood_ratio" in item:
                 lr = float(item["likelihood_ratio"])
