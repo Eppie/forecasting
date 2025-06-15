@@ -66,7 +66,7 @@ def _cache_set(table: str, key: str, value: str) -> None:
     _conn.commit()
 
 
-def run_brave_search(query: str, *, api_key: str | None = None, top_k: int = 10) -> list[str]:
+def run_brave_search(query: str, *, api_key: str | None = None, top_k: int = 3) -> list[str]:
     """
     Run a web search via Brave Search API and return up to *top_k* result URLs.
 
@@ -92,6 +92,7 @@ def run_brave_search(query: str, *, api_key: str | None = None, top_k: int = 10)
                     cached_urls.append(link)
                 if len(cached_urls) >= top_k:
                     break
+            logger.debug("Cache hit!")
             return cached_urls
         except Exception:
             pass  # fall through on cache parse errors
@@ -113,7 +114,6 @@ def run_brave_search(query: str, *, api_key: str | None = None, top_k: int = 10)
     data = r.json()
     _cache_set("brave_cache", query, json.dumps(data))
     results = data.get("results", {}).get("items", [])  # brave nests results.web.items for v1
-    # Some versions: data["web"]["results"]
     if not results and "web" in data:
         results = data["web"].get("results", [])
     urls: list[str] = []
@@ -146,6 +146,7 @@ def fetch_docs(urls: list[str], *, api_key: str | None = None) -> list[str]:
 
     texts: list[str] = []
     for u in urls:
+        logger.debug(f"Fetching {u}")
         cached_text = _cache_get("doc_cache", u)
         if cached_text is not None:
             texts.append(cached_text)
@@ -156,6 +157,7 @@ def fetch_docs(urls: list[str], *, api_key: str | None = None) -> list[str]:
             resp = requests.get(endpoint, timeout=20, headers=headers)
             if resp.status_code == _HTTP_OK:  # noqa: PLR2004
                 texts.append(resp.text)
+                logger.debug(resp.text)
                 _cache_set("doc_cache", u, resp.text)
             else:
                 texts.append("")
@@ -278,7 +280,7 @@ def gather_documents_for_reference(  # noqa: PLR0913
     """
 
     queries = generate_queries(clarified_question, ref_item)
-    logger.debug("Generated queries: %s", queries)
+    logger.info("Generated queries: %s", queries)
 
     all_urls: list[str] = []
     for q in queries:
@@ -288,6 +290,7 @@ def gather_documents_for_reference(  # noqa: PLR0913
         except Exception as exc:
             logger.debug("Brave search failed for query '%s': %s", q, exc)
 
+    pprint(all_urls)
     # Deduplicate while preserving order
     seen = set()
     unique_urls: list[str] = []
@@ -415,6 +418,7 @@ def get_base_rates(
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG)
     reference_classes = [
         ReferenceClassItem(
             reasoning="The target event is about forecasting OpenAI's "
@@ -445,10 +449,9 @@ if __name__ == "__main__":
         ),
     ]
 
-    all_queries = []
+    all_queries: list[str] = []
     for ref_item in reference_classes:
-        queries = generate_queries(
-            "What will be OpenAI's total revenue for the fiscal year ending December 31, 2027?", ref_item, n_queries=1
+        docs = gather_documents_for_reference(
+            clarified_question="What will OpenAI's revenue be for 2027?", ref_item=ref_item
         )
-        pprint(queries)
-        all_queries.extend(queries)
+        logger.debug(docs)
